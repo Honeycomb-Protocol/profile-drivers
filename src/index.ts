@@ -11,7 +11,7 @@ import { Request } from "./types";
 import { getHoneycomb } from "./config";
 import { buildEntityRoute } from "./controllers/entity";
 import { Wallets } from "./models";
-import { startSocket } from "./sockets";
+import { refreshData, startSocket } from "./sockets";
 
 dotenv.config();
 
@@ -38,7 +38,7 @@ app.use("/check", (_, res) => res.status(200).send("Server Running..."));
   const orm = await connectDB(process.env.DB_NAME || "database_tmp");
   const honeycomb = await getHoneycomb("devnet");
 
-  startSocket(honeycomb, orm);
+  refreshData(honeycomb, orm).then((_) => startSocket(honeycomb, orm));
 
   (async () => {
     const countUser = await orm.em.count(models.Profile);
@@ -48,7 +48,7 @@ app.use("/check", (_, res) => res.status(200).send("Server Running..."));
     if (countUser == 0) {
       await orm.em.insert(models.Profile, {
         address: new PublicKey("11111111111111111111111111111111"),
-        user_address: new PublicKey("11111111111111111111111111111114"),
+        useraddress: new PublicKey("11111111111111111111111111111114"),
         wallets: Wallets.from({
           primary_wallet: new PublicKey("11111111111111111111111111111112"),
           secondary_wallets: [

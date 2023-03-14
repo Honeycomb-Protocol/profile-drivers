@@ -13,7 +13,7 @@ const getProfile: Handler = (req: Request, res) => {
           address: req.params.identity,
         },
         {
-          user_address: req.params.identity,
+          useraddress: req.params.identity,
         },
         {
           wallets: {

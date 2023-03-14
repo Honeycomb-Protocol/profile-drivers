@@ -17,7 +17,7 @@ export function buildEntityRoute(model: EntityName<any>) {
             address: req.params.walletOrUser,
           },
           {
-            user_address: req.params.walletOrUser,
+            useraddress: req.params.walletOrUser,
           },
           {
             wallets: {
@@ -45,7 +45,7 @@ export function buildEntityRoute(model: EntityName<any>) {
               address: req.params.walletOrUser,
             },
             {
-              user_address: req.params.walletOrUser,
+              useraddress: req.params.walletOrUser,
             },
             {
               wallets: {

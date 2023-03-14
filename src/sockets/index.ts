@@ -1,3 +1,4 @@
+import * as web3 from "@solana/web3.js";
 import {
   HIVECONTROL_PROGRAM_ID,
   Honeycomb,
@@ -9,9 +10,54 @@ import {
 import { MikroORM } from "@mikro-orm/core";
 import { Profile, Wallets } from "../models";
 
-export const upsertUser = (orm: MikroORM, userChain: UserChain) => {};
+export const saveProfile = async (
+  honeycomb: Honeycomb,
+  orm: MikroORM,
+  profileAddress: web3.PublicKey,
+  profileChain: ProfileChain
+) => {
+  const count = await orm.em.count(Profile, {
+    address: profileAddress,
+  });
 
-export const refresh = (honeycomb: Honeycomb, orm: MikroORM) => {};
+  if (!count) {
+    const userChain = await UserChain.fromAccountAddress(
+      honeycomb.connection,
+      profileChain.user
+    );
+
+    const profile = new Profile(profileAddress);
+    profile.useraddress = profileChain.user;
+    //@ts-ignore
+    profile.wallets = Wallets.from({
+      primary_wallet: userChain.primaryWallet,
+      secondary_wallets: userChain.secondaryWallets,
+    }).toString();
+    orm.em.persist(profile);
+    await orm.em.flush();
+  }
+};
+
+export const refreshData = (honeycomb: Honeycomb, orm: MikroORM) => {
+  console.log("Refreshing Profiles...");
+  return ProfileChain.gpaBuilder()
+    .addFilter("project", honeycomb.project().address)
+    .run(honeycomb.connection)
+    .then((profilesChain) =>
+      Promise.all(
+        profilesChain.map(async (profileChain) => {
+          try {
+            await saveProfile(
+              honeycomb,
+              orm,
+              profileChain.pubkey,
+              ProfileChain.fromAccountInfo(profileChain.account)[0]
+            );
+          } catch {}
+        })
+      )
+    );
+};
 
 export const startSocket = (honeycomb: Honeycomb, orm: MikroORM) => {
   console.log("Started sockets...");
@@ -30,25 +76,7 @@ export const startSocket = (honeycomb: Honeycomb, orm: MikroORM) => {
         )[0];
         console.log(`Found new profile ${account.accountId.toString()}`);
 
-        const count = await orm.em.count(Profile, {
-          address: account.accountId,
-        });
-
-        if (!count) {
-          const userChain = await UserChain.fromAccountAddress(
-            honeycomb.connection,
-            profileChain.user
-          );
-          const profile = new Profile(account.accountId);
-          profile.user_address = profileChain.user;
-          //@ts-ignore
-          profile.wallets = Wallets.from({
-            primary_wallet: userChain.primaryWallet,
-            secondary_wallets: userChain.secondaryWallets,
-          }).toString();
-          orm.em.persist(profile);
-          orm.em.flush();
-        }
+        await saveProfile(honeycomb, orm, account.accountId, profileChain);
       } catch {
         try {
           if (userDiscriminator.join("") !== discriminator.join("")) {
@@ -58,7 +86,7 @@ export const startSocket = (honeycomb: Honeycomb, orm: MikroORM) => {
           const userChain = UserChain.fromAccountInfo(account.accountInfo)[0];
 
           const profile = await orm.em.findOne(Profile, {
-            user_address: account.accountId,
+            useraddress: account.accountId,
           });
 
           if (!!profile) {

@@ -9,9 +9,15 @@ import {
 import { PublicKey } from "@solana/web3.js";
 import { Stats } from "./Stats";
 
-interface IWallets {
+export interface IWallets {
   primary_wallet: PublicKey;
   secondary_wallets: PublicKey[];
+}
+
+export interface IProfile {
+  address: PublicKey;
+  useraddress: PublicKey;
+  wallets: IWallets;
 }
 
 export class Wallets implements IWallets {
@@ -58,7 +64,10 @@ export class Wallets implements IWallets {
 }
 
 @Entity()
-export class Profile extends BaseEntity<Profile, "address"> {
+export class Profile
+  extends BaseEntity<Profile, "address">
+  implements IProfile
+{
   @PrimaryKey()
   address!: PublicKey;
 
@@ -69,7 +78,7 @@ export class Profile extends BaseEntity<Profile, "address"> {
   stats = new Collection<Stats>(this);
 
   @Property()
-  user_address!: PublicKey;
+  useraddress!: PublicKey;
 
   @Property()
   wallets!: Wallets;
