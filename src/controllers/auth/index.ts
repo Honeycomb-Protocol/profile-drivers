@@ -1,15 +1,18 @@
 import { TransactionSignature } from "@honeycomb-protocol/hive-control";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, Keypair } from "@solana/web3.js";
 import express, { Response } from "express";
 import { Profile } from "../../models";
 
 import { Request } from "../../types";
 import { ResponseHelper } from "../../utils";
+const sendSignerHTMLInAuth = true;
 
 const router = express.Router();
+// import { verify_signature } from "./verify";
 const verify_signature = async (
-  signature: TransactionSignature,
-  wallet: PublicKey
+  signature: string,
+  wallet: string,
+  nounce: string
 ) => {
   // @TODO: Verify Signature
   return true;
@@ -30,12 +33,16 @@ router.get("/web3/:signerWallet", async (req: Request, res: Response) => {
   if (!profile) {
     return response.error("Profile not found!");
   }
+  const nonce = Keypair.generate().publicKey;
   req.session.web3UserAuthReq = {
     profileAddress: profile.address,
     signerWallet,
+    nonce,
   };
-
-  response.ok("web3UserAuthReq created successfully!");
+  if (!sendSignerHTMLInAuth)
+    return response.ok("web3UserAuthReq created successfully!", {
+      nonce,
+    });
 });
 
 router.get("/web3/verify/:signature", async (req: Request, res: Response) => {
@@ -44,10 +51,10 @@ router.get("/web3/verify/:signature", async (req: Request, res: Response) => {
   if (!req.session?.web3UserAuthReq) {
     return response.error("Auth Request not found!");
   }
-  const { profileAddress, signerWallet } = req.session.web3UserAuthReq;
+  const { profileAddress, signerWallet, nonce } = req.session.web3UserAuthReq;
 
   console.log(req.session);
-  if (!(profileAddress && signerWallet && signature && req.orm)) {
+  if (!(profileAddress && signerWallet && signature && nonce && req.orm)) {
     return response.error("Invalid data.");
   }
   const profile = await req.orm.em.findOne(Profile, {
@@ -59,7 +66,10 @@ router.get("/web3/verify/:signature", async (req: Request, res: Response) => {
   if (!profile) {
     return response.error("Profile not found!");
   }
-  const verified = await verify_signature(signature, signerWallet);
+  // const verified = await verify_signature(signature, signerWallet);
+  const verified = await verify_signature(signature, signerWallet, nonce).catch(
+    console.error
+  );
   if (!verified) {
     delete req.session.web3UserAuthReq;
     return response.error("Verification failed, web3UserAuthReq closed;");
