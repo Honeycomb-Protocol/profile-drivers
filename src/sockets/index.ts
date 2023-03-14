@@ -22,7 +22,7 @@ export const saveProfile = async (
 
   if (!count) {
     const userChain = await UserChain.fromAccountAddress(
-      honeycomb.connection,
+      honeycomb.processedConnection,
       profileChain.user
     );
 
@@ -64,7 +64,7 @@ export const refreshData = (honeycomb: Honeycomb, orm: MikroORM) => {
 
 export const startSocket = (honeycomb: Honeycomb, orm: MikroORM) => {
   console.log("Started sockets...");
-  return honeycomb.connection.onProgramAccountChange(
+  return honeycomb.processedConnection.onProgramAccountChange(
     HIVECONTROL_PROGRAM_ID,
     async (account) => {
       const discriminator = Array.from(account.accountInfo.data.slice(0, 8));
@@ -77,9 +77,10 @@ export const startSocket = (honeycomb: Honeycomb, orm: MikroORM) => {
         const profileChain = ProfileChain.fromAccountInfo(
           account.accountInfo
         )[0];
-        console.log(`Profile ${account.accountId.toString()} data changed`);
-
-        await saveProfile(honeycomb, orm, account.accountId, profileChain);
+        if (profileChain.project.equals(honeycomb.project().projectAddress)) {
+          console.log(`Profile ${account.accountId.toString()} data changed`);
+          await saveProfile(honeycomb, orm, account.accountId, profileChain);
+        }
       } catch {
         try {
           if (userDiscriminator.join("") !== discriminator.join("")) {
