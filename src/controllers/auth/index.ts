@@ -5,7 +5,7 @@ import { Profile } from "../../models";
 
 import { Request } from "../../types";
 import { ResponseHelper } from "../../utils";
-const sendSignerHTMLInAuth = true;
+const sendSignerHTMLInAuth = false;
 
 const router = express.Router();
 // import { verify_signature } from "./verify";

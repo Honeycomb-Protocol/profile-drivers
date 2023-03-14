@@ -1,29 +1,20 @@
 import express, { Response } from "express";
 import { Request } from "../../types";
 import Twitter, { OauthToken, OauthTokenSecret } from "twitter-lite";
-import config from "./config";
+import config from "../../config";
 import { ResponseHelper } from "../../utils";
 import { Profile, Wallets } from "../../models";
-import {
-  IdentityClient,
-  IdentityProfile,
-  Profile as ProfileChain,
-} from "@honeycomb-protocol/hive-control";
-
-const client = new Twitter({
-  consumer_key: config.consumer_key,
-  consumer_secret: config.consumer_secret,
-});
+import { fetchAllEntitiesFor } from "../../sockets";
 
 const router = express.Router();
 
 router.get("/", async (req: Request, res: Response) => {
   const response = new ResponseHelper(res);
 
-  if (!req.session.web3User)
+  if (!req.session.web3User || !req.twitter)
     return response.error("web3User not found in session.");
   try {
-    const twRequestToken = (await client.getRequestToken(
+    const twRequestToken = (await req.twitter.getRequestToken(
       "http://127.0.0.1:3000/twitter/auth/callback"
     )) as {
       oauth_token: OauthToken;
@@ -43,7 +34,7 @@ router.get("/", async (req: Request, res: Response) => {
 router.get("/callback", async (req: Request, res: Response) => {
   const response = new ResponseHelper(res);
 
-  if (!req.session.web3User || !req.orm || !req.honeycomb)
+  if (!req.session.web3User || !req.orm || !req.honeycomb || !req.twitter)
     return response.error("web3User not found in session.");
 
   const profile = await req.orm.em.findOne(Profile, {
@@ -53,6 +44,13 @@ router.get("/callback", async (req: Request, res: Response) => {
   if (!profile) {
     return response.error("Profile not found!");
   }
+
+  if (profile.twitterId || profile.twitterUsername) {
+    return response.conflict(
+      "Twitter credentials already set for this profile"
+    );
+  }
+
   try {
     const { oauth_verifier, oauth_token } = req.query as {
       [k: string]: string;
@@ -60,7 +58,7 @@ router.get("/callback", async (req: Request, res: Response) => {
     // const twRequestToken = req.session.twRequestToken;
     console.log("this,is,data", req.session.twRequestToken);
     delete req.session.twRequestToken;
-    const accessToken = await client.getAccessToken({
+    const accessToken = await req.twitter.getAccessToken({
       oauth_token: oauth_token,
       oauth_verifier: oauth_verifier,
     });
@@ -79,14 +77,25 @@ router.get("/callback", async (req: Request, res: Response) => {
       .fetch()
       .profile(req.honeycomb.project().address, primary_wallet);
 
-    await profileChain.add("twitterUsername", user.screen_name);
-    await profileChain.add("twitterId", user.id_str);
+    await profileChain
+      .add("twitterUsername", user.screen_name)
+      .then((_) => {
+        profile.twitterId = user.id_str;
+      })
+      .catch();
 
-    profile.twitterId = user.id_str;
-    profile.twitterUsername = user.screen_name;
+    await profileChain
+      .add("twitterId", user.id_str)
+      .then((_) => {
+        profile.twitterUsername = user.screen_name;
+      })
+      .catch();
+
     req.session.twUser = user;
     await req.orm.em.flush();
-    // console.log("user", user);
+
+    await fetchAllEntitiesFor(req.honeycomb, req.orm, req.twitter, profile);
+
     response.ok("Tw Auth Success!");
   } catch (err) {
     console.error(err);
