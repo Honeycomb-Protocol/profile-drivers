@@ -6,6 +6,12 @@ import {
 } from "@mikro-orm/core";
 import { PublicKey } from "@solana/web3.js";
 
+export interface ISteamUser {
+    steamId: PublicKey;
+    image: string;
+    name: string;
+    level: number;
+}
 
 @Entity()
 export class SteamUser extends BaseEntity<SteamUser, "steamId"> {

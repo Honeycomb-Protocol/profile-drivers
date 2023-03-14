@@ -8,6 +8,12 @@ import { PublicKey } from "@solana/web3.js";
 import { BaseEntity } from "../types/BaseEntity";
 import { SteamGame } from "./SteamGame";
 
+export interface ISteamGameCollectible {
+    appId: SteamGame;
+    image: string;
+    name: string;
+    category: string;
+}
 
 @Entity()
 export class SteamGameCollectible extends BaseEntity<SteamGameCollectible> {

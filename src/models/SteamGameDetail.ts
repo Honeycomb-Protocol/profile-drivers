@@ -1,46 +1,46 @@
-import {
-  Cascade,
-  Entity,
-  ManyToOne,
-  Property,
-} from "@mikro-orm/core";
-import { PublicKey } from "@solana/web3.js";
-import { BaseEntity } from "../types/BaseEntity";
-import { SteamGame } from "./SteamGame";
+import { Cascade, Entity, ManyToOne, Property } from '@mikro-orm/core'
+import { PublicKey } from '@solana/web3.js'
+import { BaseEntity } from '../types/BaseEntity'
+import { SteamGame } from './SteamGame'
 
-
-
+export interface ISteamGameDetail {
+  appId: SteamGame
+  totalPlayTimeHours: number
+  lastPlayedDate: number
+  singleGameTotalPlayTime: number
+  singleGameLastPlayedDate: number
+  winRatioPercent: number
+  kdratio: number
+  matches: number
+}
 @Entity()
 export class SteamGameDetail extends BaseEntity<SteamGameDetail> {
-
   @ManyToOne(() => SteamGame, {
     cascade: [Cascade.PERSIST, Cascade.REMOVE],
     nullable: true,
   })
-  appId?: SteamGame;
-
-
-  @Property()
-  totalPlayTimeHours!: number;
+  appId?: SteamGame
 
   @Property()
-  lastPlayedDate!: number;
-
-
-  @Property()
-  singleGameTotalPlayTime!: number;
+  totalPlayTimeHours!: number
 
   @Property()
-  singleGameLastPlayedDate!: number;
+  lastPlayedDate!: number
 
   @Property()
-  winRatioPercent!: number;
+  singleGameTotalPlayTime!: number
 
   @Property()
-  kdratio!: number;
+  singleGameLastPlayedDate!: number
 
   @Property()
-  matches!: number;
+  winRatioPercent!: number
+
+  @Property()
+  kdratio!: number
+
+  @Property()
+  matches!: number
 
   constructor(
     [profile_address, index]: [PublicKey, number],
@@ -52,13 +52,13 @@ export class SteamGameDetail extends BaseEntity<SteamGameDetail> {
     kdratio: number,
     matches: number,
   ) {
-    super(profile_address, index);
-    this.totalPlayTimeHours = totalPlayTimeHours;
-    this.lastPlayedDate = lastPlayedDate;
-    this.singleGameTotalPlayTime = singleGameTotalPlayTime;
-    this.singleGameLastPlayedDate = singleGameLastPlayedDate;
-    this.winRatioPercent = winRatioPercent;
-    this.kdratio = kdratio;
-    this.matches = matches;
+    super(profile_address, index)
+    this.totalPlayTimeHours = totalPlayTimeHours
+    this.lastPlayedDate = lastPlayedDate
+    this.singleGameTotalPlayTime = singleGameTotalPlayTime
+    this.singleGameLastPlayedDate = singleGameLastPlayedDate
+    this.winRatioPercent = winRatioPercent
+    this.kdratio = kdratio
+    this.matches = matches
   }
 }

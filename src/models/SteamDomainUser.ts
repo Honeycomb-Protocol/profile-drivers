@@ -6,6 +6,20 @@ import {
 import { PublicKey } from "@solana/web3.js";
 import { BaseEntity } from "../types/BaseEntity";
 
+export interface ISteamDomainUser {
+  steamId: string;
+  userName: string;
+  userImage: string;
+  location: string;
+  flag: string;
+  level: number;
+  recentlyPlayedHours: number;
+  totalPlayTimeHours: number;
+  numberOfPlayedGames: number;
+  averagePlayTimePerGameHours: number;
+  countryCode: string;
+}
+
 @Entity()
 export class SteamDomainUser extends BaseEntity<SteamDomainUser> {
   @PrimaryKey()

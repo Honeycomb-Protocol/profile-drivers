@@ -7,6 +7,12 @@ import { PublicKey } from "@solana/web3.js";
 import { BaseEntity } from "../types/BaseEntity";
 
 
+export interface ISteamFriend { 
+  steamId: string;
+  relationship: string;
+  friendSince: number;
+}
+
 @Entity()
 export class SteamFriend extends BaseEntity<SteamFriend> {
 
