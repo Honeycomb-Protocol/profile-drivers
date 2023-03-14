@@ -1,3 +1,4 @@
+import session from "express-session";
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -16,7 +17,7 @@ import { refreshData, startSocket } from "./sockets";
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 4000;
+const port = process.env.PORT || 3000;
 
 app.use(cors());
 
@@ -33,69 +34,20 @@ app.use(
 );
 
 app.use("/check", (_, res) => res.status(200).send("Server Running..."));
+app.use(
+  session({
+    secret: "keyboard cat",
+    resave: true,
+    saveUninitialized: true,
+    // cookie: { secure: true },
+  })
+);
 
 (async () => {
   const orm = await connectDB(process.env.DB_NAME || "database_tmp");
   const honeycomb = await getHoneycomb("devnet");
 
   refreshData(honeycomb, orm).then((_) => startSocket(honeycomb, orm));
-
-  (async () => {
-    const countUser = await orm.em.count(models.Profile);
-    const countStats = await orm.em.count(models.Stats);
-    // const countWallet = await orm.em.count(models.Wallet);
-    console.log({ countUser, countStats });
-    if (countUser == 0) {
-      await orm.em.insert(models.Profile, {
-        address: new PublicKey("11111111111111111111111111111111"),
-        useraddress: new PublicKey("11111111111111111111111111111114"),
-        wallets: Wallets.from({
-          primary_wallet: new PublicKey("11111111111111111111111111111112"),
-          secondary_wallets: [
-            new PublicKey("11111111111111111111111111111113"),
-          ],
-        }),
-      });
-    }
-    // if (!countWallet) {
-    //   await orm.em.insertMany(models.Wallet, [
-    //     {
-    //       profile: new PublicKey("11111111111111111111111111111111"),
-    //       address: new PublicKey("11111111111111111111111111111112"),
-    //       isPrimary: true,
-    //     },
-    //     {
-    //       profile: new PublicKey("11111111111111111111111111111111"),
-    //       address: new PublicKey("11111111111111111111111111111113"),
-    //       isPrimary: false,
-    //     },
-    //   ]);
-    // }
-    if (!countStats) {
-      await orm.em.insertMany(models.Stats, [
-        new models.Stats(
-          [new PublicKey("11111111111111111111111111111111"), 0],
-          1,
-          1
-        ),
-        new models.Stats(
-          [new PublicKey("11111111111111111111111111111111"), 1],
-          1,
-          1
-        ),
-        new models.Stats(
-          [new PublicKey("11111111111111111111111111111111"), 2],
-          1,
-          1
-        ),
-        new models.Stats(
-          [new PublicKey("11111111111111111111111111111111"), 3],
-          1,
-          1
-        ),
-      ]);
-    }
-  })();
 
   app.use((req: Request, _res, next) => {
     req.orm = orm;
@@ -121,4 +73,66 @@ app.use("/check", (_, res) => res.status(200).send("Server Running..."));
   app.listen(port, () => {
     console.log(colors.green(`[server] Listening on port ${port}`));
   });
+
+  (async () => {
+    await orm.getMigrator().up();
+    const generator = orm.getSchemaGenerator();
+    await generator.updateSchema();
+    await orm.getMigrator().down();
+
+    const countUser = await orm.em.count(models.Profile);
+    const countStats = await orm.em.count(models.Stats);
+    // const countWallet = await orm.em.count(models.Wallet);
+    console.log({ countUser, countStats });
+    // if (countUser == 0) {
+    //   await orm.em.insert(models.Profile, {
+    //     address: new PublicKey("11111111111111111111111111111111"),
+    //     useraddress: new PublicKey("11111111111111111111111111111114"),
+    //     wallets: Wallets.from({
+    //       primary_wallet: new PublicKey("11111111111111111111111111111112"),
+    //       secondary_wallets: [
+    //         new PublicKey("11111111111111111111111111111113"),
+    //       ],
+    //     }),
+    //   });
+    // }
+    // if (!countWallet) {
+    //   await orm.em.insertMany(models.Wallet, [
+    //     {
+    //       profile: new PublicKey("11111111111111111111111111111111"),
+    //       address: new PublicKey("11111111111111111111111111111112"),
+    //       isPrimary: true,
+    //     },
+    //     {
+    //       profile: new PublicKey("11111111111111111111111111111111"),
+    //       address: new PublicKey("11111111111111111111111111111113"),
+    //       isPrimary: false,
+    //     },
+    //   ]);
+    // }
+    // if (!countStats) {
+    //   await orm.em.insertMany(models.Stats, [
+    //     new models.Stats(
+    //       [new PublicKey("11111111111111111111111111111111"), 0],
+    //       1,
+    //       1
+    //     ),
+    //     new models.Stats(
+    //       [new PublicKey("11111111111111111111111111111111"), 1],
+    //       1,
+    //       1
+    //     ),
+    //     new models.Stats(
+    //       [new PublicKey("11111111111111111111111111111111"), 2],
+    //       1,
+    //       1
+    //     ),
+    //     new models.Stats(
+    //       [new PublicKey("11111111111111111111111111111111"), 3],
+    //       1,
+    //       1
+    //     ),
+    //   ]);
+    // }
+  })();
 })();

@@ -14,4 +14,5 @@ export type Request = ExpressRequest & {
   orm?: MikroORM<SqliteDriver>;
   honeycomb?: Honeycomb;
   profile?: any;
+  session?: any;
 };

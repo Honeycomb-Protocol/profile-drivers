@@ -1,0 +1,88 @@
+import express, { Response } from "express";
+import { Request } from "../../types";
+import Twitter, { OauthToken, OauthTokenSecret } from "twitter-lite";
+import config from "./config";
+import { ResponseHelper } from "../../utils";
+import { Profile } from "../../models";
+
+const client = new Twitter({
+  consumer_key: config.consumer_key,
+  consumer_secret: config.consumer_secret,
+});
+
+const router = express.Router();
+
+router.get("/", async (req: Request, res: Response) => {
+  const response = new ResponseHelper(res);
+
+  if (!req.session.web3User)
+    return response.error("web3User not found in session.");
+  try {
+    const twRequestToken = (await client.getRequestToken(
+      "http://127.0.0.1:3000/twitter/auth/callback"
+    )) as {
+      oauth_token: OauthToken;
+      oauth_token_secret: OauthTokenSecret;
+    };
+
+    console.log("twRequestToken", twRequestToken);
+    req.session.twRequestToken = twRequestToken;
+    res.redirect(
+      `https://api.twitter.com/oauth/authenticate?oauth_token=${twRequestToken.oauth_token}`
+    );
+  } catch (err: any) {
+    console.error(err);
+    response.error(err.message);
+  }
+});
+router.get("/callback", async (req: Request, res: Response) => {
+  const response = new ResponseHelper(res);
+
+  if (!req.session.web3User || !req.orm)
+    return response.error("web3User not found in session.");
+
+  const profile = await req.orm.em.findOne(Profile, {
+    address: req.session.web3User.address,
+  });
+
+  if (!profile) {
+    return response.error("Profile not found!");
+  }
+  try {
+    const { oauth_verifier, oauth_token } = req.query as {
+      [k: string]: string;
+    };
+    // const twRequestToken = req.session.twRequestToken;
+    console.log("this,is,data", req.session.twRequestToken);
+    delete req.session.twRequestToken;
+    const accessToken = await client.getAccessToken({
+      oauth_token: oauth_token,
+      oauth_verifier: oauth_verifier,
+    });
+    const userClient = new Twitter({
+      access_token_key: accessToken.oauth_token,
+      access_token_secret: accessToken.oauth_token_secret,
+      consumer_key: config.consumer_key,
+      consumer_secret: config.consumer_secret,
+    });
+    const user = await userClient.get("account/verify_credentials");
+    profile.twitterId = user.id_str;
+    profile.twitterUsername = user.screen_name;
+    req.session.twUser = user;
+    req.orm.em.flush();
+    // console.log("user", user);
+    response.ok("Tw Auth Success!");
+  } catch (err) {
+    console.error(err);
+    res.sendStatus(500);
+  }
+});
+// router.get("/", (req: Request, res: Response) => {
+//   if (req.session.user) {
+//     res.send("You are logged in as " + req.session.user.name);
+//   } else {
+//     res.send("Please log in");
+//   }
+// });
+
+export default router;

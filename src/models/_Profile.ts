@@ -18,6 +18,8 @@ export interface IProfile {
   address: PublicKey;
   useraddress: PublicKey;
   wallets: IWallets;
+  twitterUsername?: string;
+  twitterId?: string;
 }
 
 export class Wallets implements IWallets {
@@ -71,9 +73,6 @@ export class Profile
   @PrimaryKey()
   address!: PublicKey;
 
-  // @PrimaryKey()
-  // address!: string;
-
   @OneToMany(() => Stats, (stats) => stats.profile)
   stats = new Collection<Stats>(this);
 
@@ -82,6 +81,12 @@ export class Profile
 
   @Property()
   wallets!: Wallets;
+
+  @Property({ nullable: true })
+  twitterId?: string;
+
+  @Property({ nullable: true })
+  twitterUsername?: string;
 
   constructor(address: PublicKey) {
     super();

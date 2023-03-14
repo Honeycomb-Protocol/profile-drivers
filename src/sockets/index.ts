@@ -43,8 +43,9 @@ export const refreshData = (honeycomb: Honeycomb, orm: MikroORM) => {
   return ProfileChain.gpaBuilder()
     .addFilter("project", honeycomb.project().address)
     .run(honeycomb.connection)
-    .then((profilesChain) =>
-      Promise.all(
+    .then((profilesChain) => {
+      console.log(profilesChain.length);
+      return Promise.all(
         profilesChain.map(async (profileChain) => {
           try {
             await saveProfile(
@@ -53,10 +54,12 @@ export const refreshData = (honeycomb: Honeycomb, orm: MikroORM) => {
               profileChain.pubkey,
               ProfileChain.fromAccountInfo(profileChain.account)[0]
             );
-          } catch {}
+          } catch (e) {
+            console.error(e);
+          }
         })
-      )
-    );
+      );
+    });
 };
 
 export const startSocket = (honeycomb: Honeycomb, orm: MikroORM) => {
