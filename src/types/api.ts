@@ -13,5 +13,5 @@ export type IResponse<T = any> = {
 export type Request = ExpressRequest & {
   orm?: MikroORM<SqliteDriver>;
   honeycomb?: Honeycomb;
-  user?: any;
+  profile?: any;
 };

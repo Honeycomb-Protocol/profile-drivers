@@ -19,11 +19,11 @@ export const authenticate: Handler = async (
     const decoded = verify_token(req.headers.authorization.split(" ")[1]);
     if (!decoded) return response.unauthorized("Invalid Token");
     try {
-      req.user = await fetchUser(decoded.primary_wallet);
+      req.profile = await fetchUser(decoded.primary_wallet);
       next();
     } catch {
       return response.unauthorized(
-        "Could not find the user associated with token"
+        "Could not find the profile associated with token"
       );
     }
   } else {
@@ -45,7 +45,7 @@ export const bypass_authenticate: Handler = async (
     const decoded = verify_token(req.headers.authorization.split(" ")[1]);
     if (decoded) {
       try {
-        req.user = await fetchUser(decoded.primary_wallet);
+        req.profile = await fetchUser(decoded.primary_wallet);
       } catch (e) {}
     }
   }

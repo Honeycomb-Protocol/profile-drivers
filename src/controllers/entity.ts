@@ -11,19 +11,23 @@ export function buildEntityRoute(model: EntityName<any>) {
     if (!req.orm) return response.error("ORM not initialized");
 
     const data = await req.orm.em.find(model, {
-      user: {
+      profile: {
         $or: [
           {
             address: req.params.walletOrUser,
           },
           {
+            user_address: req.params.walletOrUser,
+          },
+          {
             wallets: {
-              address: req.params.walletOrUser,
+              $like: `%${req.params.walletOrUser}%`,
             },
           },
         ],
       },
     });
+
     return response.ok(undefined, data);
   });
 
@@ -35,10 +39,13 @@ export function buildEntityRoute(model: EntityName<any>) {
       model,
       {
         index: parseInt(req.params.index),
-        user: {
+        profile: {
           $or: [
             {
               address: req.params.walletOrUser,
+            },
+            {
+              user_address: req.params.walletOrUser,
             },
             {
               wallets: {
@@ -49,7 +56,7 @@ export function buildEntityRoute(model: EntityName<any>) {
         },
       },
       {
-        populate: ["user"],
+        populate: ["profile"],
       }
     );
     return response.ok(undefined, data);

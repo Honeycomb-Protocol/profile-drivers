@@ -11,11 +11,11 @@ export class Stats extends BaseEntity<Stats> {
   level!: number;
 
   constructor(
-    [user_address, index]: [PublicKey, number],
+    [profile_address, index]: [PublicKey, number],
     rank: number,
     level: number
   ) {
-    super(user_address, index);
+    super(profile_address, index);
     this.rank = rank;
     this.level = level;
   }

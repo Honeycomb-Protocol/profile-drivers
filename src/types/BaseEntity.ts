@@ -6,14 +6,13 @@ import {
   Cascade,
 } from "@mikro-orm/core";
 import { PublicKey } from "@solana/web3.js";
-
-import { User } from "../models/User";
+import { Profile } from "../models/_Profile";
 
 export abstract class BaseEntity<
   T extends {
     _id: number;
     index: number;
-    user?: User;
+    profile?: Profile;
     createdAt: Date;
     updatedAt: Date;
   }
@@ -30,15 +29,15 @@ export abstract class BaseEntity<
   @Property()
   index!: number;
 
-  @ManyToOne(() => User, {
+  @ManyToOne(() => Profile, {
     cascade: [Cascade.PERSIST, Cascade.REMOVE],
     nullable: true,
   })
-  user!: User;
+  profile?: Profile;
 
-  constructor(user_address: PublicKey, index: number) {
+  constructor(profile_address: PublicKey, index: number) {
     super();
     this.index = index;
-    this.user = new User(user_address);
+    this.profile = new Profile(profile_address);
   }
 }
