@@ -1,8 +1,12 @@
-import * as anchor from "@project-serum/anchor";
 import * as web3 from "@solana/web3.js";
 import fs from "fs";
 import dotenv from "dotenv";
-import { Config, Project } from "./types";
+import { Project } from "./types";
+import {
+  Honeycomb,
+  HoneycombProject,
+  identityModule,
+} from "@honeycomb-protocol/hive-control";
 
 dotenv.config();
 
@@ -16,37 +20,33 @@ const mainnetdRpc =
 
 const projects = JSON.parse(fs.readFileSync("./projects.json").toString());
 
-export const getConfig = <T extends anchor.Idl = any>(
+export async function getHoneycomb(
   projectName: string,
   opts?: web3.ConfirmOptions
-): Config<T> => {
+) {
   const project: Project = projects[projectName];
   if (!project) throw new Error("Project not found");
 
-  const RPC = project.rpc || projectName !== "devnet" ? mainnetdRpc : devnetRpc;
-
-  const connection = new web3.Connection(RPC);
-
-  const wallet = new anchor.Wallet(
-    web3.Keypair.fromSecretKey(Uint8Array.from(project.key))
-  );
+  const RPC =
+    project.rpc || (projectName !== "devnet" ? mainnetdRpc : devnetRpc);
 
   if (!opts) {
     opts = {
-      preflightCommitment: "singleGossip",
+      commitment: "processed",
+      skipPreflight: false,
     };
   }
-  const provider = new anchor.AnchorProvider(connection, wallet, opts);
 
-  return {
-    wallet,
-    connection,
-    provider,
-    program: new anchor.Program<T>(
-      IDL,
-      new web3.PublicKey(project.program),
-      provider
-    ),
-    project: new web3.PublicKey(project.address),
-  };
-};
+  const honeycomb = new Honeycomb(new web3.Connection(RPC, opts));
+  honeycomb.use(
+    identityModule(web3.Keypair.fromSecretKey(Uint8Array.from(project.driver)))
+  );
+  honeycomb.use(
+    await HoneycombProject.fromAddress(
+      honeycomb.connection,
+      new web3.PublicKey(project.address)
+    )
+  );
+
+  return honeycomb;
+}

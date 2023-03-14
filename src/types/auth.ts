@@ -1,3 +1,3 @@
 export type Token = {
-  user_id: number;
+  primary_wallet: string;
 };
