@@ -89,7 +89,7 @@ export async function fetchTweets(
   });
 
   for (let profile of profiles) {
-    //@ts-ignore
+    // @ts-ignore
     const { primary_wallet } = Wallets.parse(profile.wallets);
     const profileObj = await honeycomb
       .identity()

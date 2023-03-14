@@ -20,12 +20,12 @@ const config = {
   rpc_url: process.env.RPC_URL || "https://api.mainnet-beta.solana.com",
   db_name: process.env.DB_NAME || "temp",
 
-  twitter_consumer_key: process.env.TWITTER_API_KEY,
-  twitter_consumer_secret: process.env.TWITTER_SECRET,
-  twitter_access_token_key: process.env.TWITTER_ACCESS_TOKEN,
-  twitter_access_token_secret: process.env.TWITTER_ACCESS_TOKEN_SECRET,
-  twitter_bearer_token: process.env.TWITTER_BEARER_TOKEN,
-} as { [k: string]: string };
+  twitter_consumer_key: process.env.TWITTER_API_KEY || process.exit(1),
+  twitter_consumer_secret: process.env.TWITTER_SECRET || process.exit(1),
+  twitter_access_token_key: process.env.TWITTER_ACCESS_TOKEN || "",
+  twitter_access_token_secret: process.env.TWITTER_ACCESS_TOKEN_SECRET || "",
+  twitter_bearer_token: process.env.TWITTER_BEARER_TOKEN || "",
+};
 export default config;
 
 export const projects = JSON.parse(

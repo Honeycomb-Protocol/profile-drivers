@@ -1,29 +1,19 @@
 import express, { Response } from "express";
 import { Request } from "../../types";
 import Twitter, { OauthToken, OauthTokenSecret } from "twitter-lite";
-import config from "./config";
+import config from "../../config";
 import { ResponseHelper } from "../../utils";
 import { Profile, Wallets } from "../../models";
-import {
-  IdentityClient,
-  IdentityProfile,
-  Profile as ProfileChain,
-} from "@honeycomb-protocol/hive-control";
-
-const client = new Twitter({
-  consumer_key: config.consumer_key,
-  consumer_secret: config.consumer_secret,
-});
 
 const router = express.Router();
 
 router.get("/", async (req: Request, res: Response) => {
   const response = new ResponseHelper(res);
 
-  if (!req.session.web3User)
+  if (!req.session.web3User || !req.twitter)
     return response.error("web3User not found in session.");
   try {
-    const twRequestToken = (await client.getRequestToken(
+    const twRequestToken = (await req.twitter.getRequestToken(
       "http://127.0.0.1:3000/twitter/auth/callback"
     )) as {
       oauth_token: OauthToken;
@@ -43,7 +33,7 @@ router.get("/", async (req: Request, res: Response) => {
 router.get("/callback", async (req: Request, res: Response) => {
   const response = new ResponseHelper(res);
 
-  if (!req.session.web3User || !req.orm || !req.honeycomb)
+  if (!req.session.web3User || !req.orm || !req.honeycomb || !req.twitter)
     return response.error("web3User not found in session.");
 
   const profile = await req.orm.em.findOne(Profile, {
@@ -60,15 +50,15 @@ router.get("/callback", async (req: Request, res: Response) => {
     // const twRequestToken = req.session.twRequestToken;
     console.log("this,is,data", req.session.twRequestToken);
     delete req.session.twRequestToken;
-    const accessToken = await client.getAccessToken({
+    const accessToken = await req.twitter.getAccessToken({
       oauth_token: oauth_token,
       oauth_verifier: oauth_verifier,
     });
     const userClient = new Twitter({
       access_token_key: accessToken.oauth_token,
       access_token_secret: accessToken.oauth_token_secret,
-      consumer_key: config.consumer_key,
-      consumer_secret: config.consumer_secret,
+      consumer_key: config.twitter_consumer_key,
+      consumer_secret: config.twitter_consumer_secret,
     });
     const user = await userClient.get("account/verify_credentials");
 
