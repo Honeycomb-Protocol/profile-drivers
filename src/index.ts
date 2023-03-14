@@ -11,7 +11,7 @@ import { connectDB } from "./utils";
 import { Request } from "./types";
 import { getHoneycomb } from "./config";
 import { buildEntityRoute } from "./controllers/entity";
-import { Wallets } from "./models";
+import sessionStore from "./session-store";
 import { refreshData, startSocket } from "./sockets";
 
 dotenv.config();
@@ -39,6 +39,7 @@ app.use(
     secret: "keyboard cat",
     resave: true,
     saveUninitialized: true,
+    store: sessionStore,
     // cookie: { secure: true },
   })
 );
