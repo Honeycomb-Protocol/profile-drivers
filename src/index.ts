@@ -8,7 +8,7 @@ import routes from "./controllers";
 import * as models from "./models";
 import { connectDB } from "./utils";
 import { Request } from "./types";
-import config, { getHoneycomb, steamClient, twitterClient } from "./config";
+import config, { getHoneycomb, steamClient } from "./config";
 import { buildEntityRoute } from "./controllers/entity";
 import sessionStore from "./session-store";
 import { refreshData, startSocket } from "./sockets";
@@ -47,31 +47,29 @@ app.use(
 (async () => {
   const honeycomb = await getHoneycomb("devnet");
   const orm = await connectDB(honeycomb.project().address.toString() + "_db");
-  const twitter = twitterClient();
   const steam = steamClient();
   app.use((req: Request, _res, next) => {
     req.orm = orm;
     req.honeycomb = honeycomb;
-    req.twitter = twitter;
     req.steam = steam;
     next();
   });
 
   honeycomb.project().profileDataConfig.forEach((config, label) => {
-    if (config.__kind === "Entity") {
-      const capitalizeLabel = label[0].toUpperCase() + label.slice(1);
-      //@ts-ignore
-      if (!models[capitalizeLabel])
-        throw new Error(
-          `${capitalizeLabel} entity does not have a defined model`
-        );
+    // if (config.__kind === "Entity") {
+    //   const capitalizeLabel = label[0].toUpperCase() + label.slice(1);
+    //   //@ts-ignore
+    //   if (!models[capitalizeLabel])
+    //     throw new Error(
+    //       `${capitalizeLabel} entity does not have a defined model`
+    //     );
 
-      //@ts-ignore
-      app.use("/entity/" + label, buildEntityRoute(models[label]));
-    }
+    //   //@ts-ignore
+    //   app.use("/entity/" + label, buildEntityRoute(models[label]));
+    // }
   });
 
-  refreshData(honeycomb, orm, twitter).then((_) => startSocket(honeycomb, orm));
+  refreshData(honeycomb, orm).then((_) => startSocket(honeycomb, orm));
 
   app.use(routes);
   crons();

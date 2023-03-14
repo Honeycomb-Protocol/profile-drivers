@@ -7,7 +7,6 @@ import {
   HoneycombProject,
   identityModule,
 } from "@honeycomb-protocol/hive-control";
-import Twitter from "twitter-lite";
 import SteamAuth from 'node-steam-openid';
 
 dotenv.config();
@@ -21,11 +20,6 @@ const config = {
   rpc_url: process.env.RPC_URL || "https://api.mainnet-beta.solana.com",
   db_name: process.env.DB_NAME || "temp",
   steam_api_key: process.env.STEAM_API_KEY || process.exit(1),
-  twitter_consumer_key: process.env.TWITTER_API_KEY || process.exit(1),
-  twitter_consumer_secret: process.env.TWITTER_SECRET || process.exit(1),
-  twitter_access_token_key: process.env.TWITTER_ACCESS_TOKEN || "",
-  twitter_access_token_secret: process.env.TWITTER_ACCESS_TOKEN_SECRET || "",
-  twitter_bearer_token: process.env.TWITTER_BEARER_TOKEN || "",
 };
 export default config;
 
@@ -60,19 +54,6 @@ export async function getHoneycomb(
   );
 
   return honeycomb;
-}
-
-export function twitterClient() {
-  return new Twitter({
-    subdomain: "api",
-    version: "2",
-    extension: false,
-    consumer_key: config.twitter_consumer_key,
-    consumer_secret: config.twitter_consumer_secret,
-    // bearer_token: config.twitter_bearer_token,
-    access_token_key: config.twitter_access_token_key,
-    access_token_secret: config.twitter_access_token_secret,
-  });
 }
 
 export function steamClient() {

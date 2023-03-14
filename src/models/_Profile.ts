@@ -8,7 +8,6 @@ import {
 } from "@mikro-orm/core";
 import { PublicKey } from "@solana/web3.js";
 import { Stats } from "./Stats";
-import { Tweets } from "./Tweets";
 
 export interface IWallets {
   primary_wallet: PublicKey;
@@ -19,8 +18,8 @@ export interface IProfile {
   address: PublicKey;
   useraddress: PublicKey;
   wallets: IWallets;
-  twitterUsername?: string;
-  twitterId?: string;
+  steamUsername?: string;
+  steamId?: string;
 }
 
 export class Wallets implements IWallets {
@@ -85,24 +84,12 @@ export class Profile
   @Property({
     nullable: true,
   })
-  twitterId!: string;
-
-  @Property({
-    nullable: true,
-  })
-  twitterUsername!: string;
-  @Property({
-    nullable: true,
-  })
   steamId!: string;
 
   @Property({
     nullable: true,
   })
   steamUsername!: string;
-
-  @OneToMany(() => Tweets, (tweet) => tweet.profile)
-  tweets = new Collection<Tweets>(this);
 
   constructor(address: PublicKey) {
     super();

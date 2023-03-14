@@ -9,8 +9,6 @@ import {
 } from "@honeycomb-protocol/hive-control";
 import { MikroORM } from "@mikro-orm/core";
 import { Profile, Wallets } from "../models";
-import Twitter from "twitter-lite";
-import { ITweet, Tweets } from "../models/Tweets";
 
 export async function saveProfile(
   honeycomb: Honeycomb,
@@ -18,17 +16,17 @@ export async function saveProfile(
   profileAddress: web3.PublicKey,
   profileChain: ProfileChain
 ) {
-  const count = await orm.em.count(Profile, {
+  let profile = await orm.em.findOne(Profile, {
     address: profileAddress,
   });
 
-  if (!count) {
+  if (!profile) {
     const userChain = await UserChain.fromAccountAddress(
       honeycomb.processedConnection,
       profileChain.user
     );
 
-    const profile = new Profile(profileAddress);
+    profile = new Profile(profileAddress);
     profile.useraddress = profileChain.user;
     //@ts-ignore
     profile.wallets = Wallets.from({
@@ -36,19 +34,21 @@ export async function saveProfile(
       secondary_wallets: userChain.secondaryWallets,
     }).toString();
 
-    const twitterId = profileChain.data.get("twitterId");
-    if (twitterId && twitterId.__kind == "SingleValue") {
-      profile.twitterId = twitterId.value;
-    }
-
-    const twitterUsername = profileChain.data.get("twitterUsername");
-    if (twitterUsername && twitterUsername.__kind == "SingleValue") {
-      profile.twitterUsername = twitterUsername.value;
-    }
-
     orm.em.persist(profile);
-    await orm.em.flush();
   }
+
+  const steamId = profileChain.data.get("steamId");
+  if (steamId && steamId.__kind == "SingleValue") {
+    profile.steamId = steamId.value;
+  }
+
+  const steamUsername = profileChain.data.get("steamUsername");
+  if (steamUsername && steamUsername.__kind == "SingleValue") {
+    profile.steamUsername = steamUsername.value;
+  }
+
+  await orm.em.flush();
+  await fetchAllEntitiesFor(honeycomb, orm, profile);
 }
 
 export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
@@ -75,113 +75,109 @@ export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
     });
 }
 
-export async function fetchTweets(
+export async function fetchFriendList(
   honeycomb: Honeycomb,
   orm: MikroORM,
-  twitter: Twitter,
   profile: Profile
 ) {
   //@ts-ignore
-  const { primary_wallet } = Wallets.parse(profile.wallets);
-  const profileObj = await honeycomb
-    .identity()
-    .fetch()
-    .profile(undefined, primary_wallet);
-  const tweets = profileObj.entity<ITweet>("tweets");
-  tweets.setLeaves(
-    await orm.em
-      .find(
-        Tweets,
-        {
-          profile: {
-            address: profile.address,
-          },
-        },
-        {
-          orderBy: {
-            index: 1,
-          },
-        }
-      )
-      .then((tweets) => tweets.map((t) => t.toJSON()))
-  );
+  // const { primary_wallet } = Wallets.parse(profile.wallets);
+  // const profileObj = await honeycomb
+  //   .identity()
+  //   .fetch()
+  //   .profile(undefined, primary_wallet);
+  // const tweets = profileObj.entity<ITweet>("tweets");
+  // tweets.setLeaves(
+  //   await orm.em
+  //     .find(
+  //       Tweets,
+  //       {
+  //         profile: {
+  //           address: profile.address,
+  //         },
+  //       },
+  //       {
+  //         orderBy: {
+  //           index: 1,
+  //         },
+  //       }
+  //     )
+  //     .then((tweets) => tweets.map((t) => t.toJSON()))
+  // );
 
-  const twitterId = profileObj.get("twitterId");
+  // const steamId = profileObj.get("steamId");
 
-  if (!twitterId) return;
+  // if (!steamId) return;
 
-  const tweetsRaw = await twitter.get(`users/${twitterId}/tweets`);
+  // const tweetsRaw = await steam.get(`users/${steamId}/tweets`);
 
-  for (let tweetRaw of tweetsRaw.data) {
-    const dbTweet = await orm.em.findOne(Tweets, {
-      tweetId: tweetRaw.id,
-    });
-    const storedTweet = tweets.values.find((t) => t.tweetId == tweetRaw.id);
-    let index = tweets.values.length;
+  // for (let tweetRaw of tweetsRaw.data) {
+  //   const dbTweet = await orm.em.findOne(Tweets, {
+  //     tweetId: tweetRaw.id,
+  //   });
+  //   const storedTweet = tweets.values.find((t) => t.tweetId == tweetRaw.id);
+  //   let index = tweets.values.length;
 
-    try {
-      if (storedTweet) {
-        index = storedTweet.index;
-        // await tweets.set(index, {
-        //   index,
-        //   tweetId: tweetRaw.id,
-        //   text: tweetRaw.text,
-        // });
-      } else {
-        await tweets.add({
-          index,
-          tweetId: tweetRaw.id,
-          text: tweetRaw.text,
-        });
-      }
+  //   try {
+  //     if (storedTweet) {
+  //       index = storedTweet.index;
+  //       // await tweets.set(index, {
+  //       //   index,
+  //       //   tweetId: tweetRaw.id,
+  //       //   text: tweetRaw.text,
+  //       // });
+  //     } else {
+  //       await tweets.add({
+  //         index,
+  //         tweetId: tweetRaw.id,
+  //         text: tweetRaw.text,
+  //       });
+  //     }
 
-      if (dbTweet) {
-        dbTweet.text = tweetRaw.text;
-      } else {
-        const newTweet = new Tweets(
-          [profile.address, index],
-          tweetRaw.id,
-          tweetRaw.text
-        );
-        orm.em.persist(newTweet);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }
+  //     if (dbTweet) {
+  //       dbTweet.text = tweetRaw.text;
+  //     } else {
+  //       const newTweet = new Tweets(
+  //         [profile.address, index],
+  //         tweetRaw.id,
+  //         tweetRaw.text
+  //       );
+  //       orm.em.persist(newTweet);
+  //     }
+  //   } catch (e) {
+  //     console.error(e);
+  //   }
+  // }
 
-  return orm.em.flush();
+  // return orm.em.flush();
 }
 
 export async function fetchAllEntitiesFor(
   honeycomb: Honeycomb,
   orm: MikroORM,
-  twitter: Twitter,
   profile: Profile
 ) {
   // All Entities for this profile will be fetched here
-  await fetchTweets(honeycomb, orm, twitter, profile);
+  await fetchFriendList(honeycomb, orm, profile);
 }
 
 export async function fetchAllEntitiesForAllUser(
   honeycomb: Honeycomb,
-  orm: MikroORM,
-  twitter: Twitter
+  orm: MikroORM
 ) {
   const profiles = await orm.em.find(Profile, {});
 
   for (let profile of profiles) {
-    await fetchAllEntitiesFor(honeycomb, orm, twitter, profile);
+    await fetchAllEntitiesFor(honeycomb, orm, profile);
   }
 }
 
 export async function refreshData(
   honeycomb: Honeycomb,
-  orm: MikroORM,
-  twitter: Twitter
+  orm: MikroORM
 ) {
   await fetchProfiles(honeycomb, orm);
-  await fetchAllEntitiesForAllUser(honeycomb, orm, twitter);
+  await fetchAllEntitiesForAllUser(honeycomb, orm);
 }
 
 export function startSocket(honeycomb: Honeycomb, orm: MikroORM) {
