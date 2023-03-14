@@ -8,6 +8,7 @@ import {
   identityModule,
 } from "@honeycomb-protocol/hive-control";
 import Twitter from "twitter-lite";
+import SteamAuth from 'node-steam-openid';
 
 dotenv.config();
 
@@ -19,7 +20,7 @@ const config = {
   jwt_secret: process.env.JWT_SECRET || "secret",
   rpc_url: process.env.RPC_URL || "https://api.mainnet-beta.solana.com",
   db_name: process.env.DB_NAME || "temp",
-
+  steam_api_key: process.env.STEAM_API_KEY || process.exit(1),
   twitter_consumer_key: process.env.TWITTER_API_KEY || process.exit(1),
   twitter_consumer_secret: process.env.TWITTER_SECRET || process.exit(1),
   twitter_access_token_key: process.env.TWITTER_ACCESS_TOKEN || "",
@@ -71,5 +72,13 @@ export function twitterClient() {
     // bearer_token: config.twitter_bearer_token,
     access_token_key: config.twitter_access_token_key,
     access_token_secret: config.twitter_access_token_secret,
+  });
+}
+
+export function steamClient() {
+  return new SteamAuth({
+    realm: 'http://127.0.0.1:3000', // Site name displayed to users on logon
+    returnUrl: 'http://127.0.0.1:3000/steam/auth/callback', // Your return route
+    apiKey: config.steam_api_key, // Steam API key
   });
 }

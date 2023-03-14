@@ -8,7 +8,7 @@ import routes from "./controllers";
 import * as models from "./models";
 import { connectDB } from "./utils";
 import { Request } from "./types";
-import config, { getHoneycomb, twitterClient } from "./config";
+import config, { getHoneycomb, steamClient, twitterClient } from "./config";
 import { buildEntityRoute } from "./controllers/entity";
 import sessionStore from "./session-store";
 import { refreshData, startSocket } from "./sockets";
@@ -48,11 +48,12 @@ app.use(
   const honeycomb = await getHoneycomb("devnet");
   const orm = await connectDB(honeycomb.project().address.toString() + "_db");
   const twitter = twitterClient();
-
+  const steam = steamClient();
   app.use((req: Request, _res, next) => {
     req.orm = orm;
     req.honeycomb = honeycomb;
     req.twitter = twitter;
+    req.steam = steam;
     next();
   });
 

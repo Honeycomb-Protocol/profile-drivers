@@ -69,8 +69,7 @@ export class Wallets implements IWallets {
 @Entity()
 export class Profile
   extends BaseEntity<Profile, "address">
-  implements IProfile
-{
+  implements IProfile {
   @PrimaryKey()
   address!: PublicKey;
 
@@ -92,6 +91,15 @@ export class Profile
     nullable: true,
   })
   twitterUsername!: string;
+  @Property({
+    nullable: true,
+  })
+  steamId!: string;
+
+  @Property({
+    nullable: true,
+  })
+  steamUsername!: string;
 
   @OneToMany(() => Tweets, (tweet) => tweet.profile)
   tweets = new Collection<Tweets>(this);
