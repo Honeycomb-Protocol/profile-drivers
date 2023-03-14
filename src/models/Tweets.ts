@@ -10,7 +10,7 @@ export interface ITweet {
 
 @Entity()
 export class Tweets extends BaseEntity<Tweets> {
-  @PrimaryKey()
+  @Property()
   tweetId!: string;
 
   @Property()

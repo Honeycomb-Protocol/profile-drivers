@@ -10,5 +10,10 @@ export const connectDB = async (dbName: string) => {
     allowGlobalContext: true,
   });
 
+  await orm.getMigrator().up();
+  const generator = orm.getSchemaGenerator();
+  await generator.updateSchema();
+  await orm.getMigrator().down();
+
   return orm;
 };

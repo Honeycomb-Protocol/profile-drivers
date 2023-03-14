@@ -3,7 +3,12 @@ import { Request } from "../../types";
 import Twitter, { OauthToken, OauthTokenSecret } from "twitter-lite";
 import config from "./config";
 import { ResponseHelper } from "../../utils";
-import { Profile } from "../../models";
+import { Profile, Wallets } from "../../models";
+import {
+  IdentityClient,
+  IdentityProfile,
+  Profile as ProfileChain,
+} from "@honeycomb-protocol/hive-control";
 
 const client = new Twitter({
   consumer_key: config.consumer_key,
@@ -38,7 +43,7 @@ router.get("/", async (req: Request, res: Response) => {
 router.get("/callback", async (req: Request, res: Response) => {
   const response = new ResponseHelper(res);
 
-  if (!req.session.web3User || !req.orm)
+  if (!req.session.web3User || !req.orm || !req.honeycomb)
     return response.error("web3User not found in session.");
 
   const profile = await req.orm.em.findOne(Profile, {
@@ -66,10 +71,21 @@ router.get("/callback", async (req: Request, res: Response) => {
       consumer_secret: config.consumer_secret,
     });
     const user = await userClient.get("account/verify_credentials");
+
+    //@ts-ignore
+    const { primary_wallet } = Wallets.parse(profile.wallets);
+    const profileChain = await req.honeycomb
+      .identity()
+      .fetch()
+      .profile(req.honeycomb.project().address, primary_wallet);
+
+    await profileChain.add("twitterUsername", user.screen_name);
+    await profileChain.add("twitterId", user.id_str);
+
     profile.twitterId = user.id_str;
     profile.twitterUsername = user.screen_name;
     req.session.twUser = user;
-    req.orm.em.flush();
+    await req.orm.em.flush();
     // console.log("user", user);
     response.ok("Tw Auth Success!");
   } catch (err) {

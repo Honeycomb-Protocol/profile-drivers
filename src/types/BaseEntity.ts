@@ -38,6 +38,7 @@ export abstract class BaseEntity<
   constructor(profile_address: PublicKey, index: number) {
     super();
     this.index = index;
-    this.profile = new Profile(profile_address);
+    //@ts-ignore
+    this.profile = profile_address;
   }
 }

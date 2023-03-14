@@ -35,6 +35,17 @@ export async function saveProfile(
       primary_wallet: userChain.primaryWallet,
       secondary_wallets: userChain.secondaryWallets,
     }).toString();
+
+    const twitterId = profileChain.data.get("twitterId");
+    if (twitterId && twitterId.__kind == "SingleValue") {
+      profile.twitterId = twitterId.value;
+    }
+
+    const twitterUsername = profileChain.data.get("twitterUsername");
+    if (twitterUsername && twitterUsername.__kind == "SingleValue") {
+      profile.twitterUsername = twitterUsername.value;
+    }
+
     orm.em.persist(profile);
     await orm.em.flush();
   }
@@ -77,74 +88,78 @@ export async function fetchTweets(
     // },
   });
 
-  return Promise.all(
-    profiles.map(async (profile) => {
-      //@ts-ignore
-      const { primary_wallet } = Wallets.parse(profile.wallets);
-      const profileObj = await honeycomb
-        .identity()
-        .fetch()
-        .profile(undefined, primary_wallet);
-      const tweets = profileObj.entity<ITweet>("tweets");
-      tweets.setLeaves(
-        await orm.em
-          .find(Tweets, {
+  for (let profile of profiles) {
+    //@ts-ignore
+    const { primary_wallet } = Wallets.parse(profile.wallets);
+    const profileObj = await honeycomb
+      .identity()
+      .fetch()
+      .profile(undefined, primary_wallet);
+    const tweets = profileObj.entity<ITweet>("tweets");
+    tweets.setLeaves(
+      await orm.em
+        .find(
+          Tweets,
+          {
             profile: {
               address: profile.address,
             },
-          })
-          .then((tweets) => tweets.map((t) => t.toJSON()))
-      );
+          },
+          {
+            orderBy: {
+              index: 1,
+            },
+          }
+        )
+        .then((tweets) => tweets.map((t) => t.toJSON()))
+    );
 
-      twitter
-        .get(`users/1281956359538388992/tweets`)
-        // .get(`users/${profile.twitterId}/tweets`)
-        .then(async (tweetsRaw) => {
-          tweetsRaw.data.map(async (tweetRaw: any) => {
-            const dbTweet = await orm.em.findOne(Tweets, {
-              tweetId: tweetRaw.id,
-            });
-            const storedTweet = tweets.values.find(
-              (t) => t.tweetId == tweetRaw.id
-            );
-            let index = tweets.values.length;
+    const twitterId = profileObj.get("twitterId");
 
-            try {
-              if (storedTweet) {
-                index = storedTweet.index;
-                await tweets.set(index, {
-                  index,
-                  tweetId: tweetRaw.id,
-                  text: tweetRaw.text,
-                });
-              } else {
-                await tweets.add({
-                  index,
-                  tweetId: tweetRaw.id,
-                  text: tweetRaw.text,
-                });
-              }
+    if (!twitterId) continue;
 
-              if (dbTweet) {
-                dbTweet.text = tweetRaw.text;
-              } else {
-                const newTweet = new Tweets(
-                  [profile.address, index],
-                  tweetRaw.id,
-                  tweetRaw.text
-                );
-                orm.em.persist(newTweet);
-              }
-            } catch (e) {
-              console.error(e);
-            }
+    const tweetsRaw = await twitter.get(`users/${twitterId}/tweets`);
+
+    for (let tweetRaw of tweetsRaw.data) {
+      const dbTweet = await orm.em.findOne(Tweets, {
+        tweetId: tweetRaw.id,
+      });
+      const storedTweet = tweets.values.find((t) => t.tweetId == tweetRaw.id);
+      let index = tweets.values.length;
+
+      try {
+        if (storedTweet) {
+          index = storedTweet.index;
+          // await tweets.set(index, {
+          //   index,
+          //   tweetId: tweetRaw.id,
+          //   text: tweetRaw.text,
+          // });
+        } else {
+          await tweets.add({
+            index,
+            tweetId: tweetRaw.id,
+            text: tweetRaw.text,
           });
-        })
-        .catch((e) => console.error(e));
+        }
 
-      return orm.em.flush();
-    })
-  );
+        if (dbTweet) {
+          dbTweet.text = tweetRaw.text;
+        } else {
+          const newTweet = new Tweets(
+            [profile.address, index],
+            tweetRaw.id,
+            tweetRaw.text
+          );
+          orm.em.persist(newTweet);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    await orm.em.flush();
+  }
 }
 
 export async function refreshData(
