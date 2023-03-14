@@ -24,9 +24,10 @@ const getProfile: Handler = (req: Request, res) => {
     })
     .then((profile) => {
       if (!profile) return response.notFound();
+      const profileNew = profile.toJSON();
       //@ts-ignore
-      profile.wallets = Wallets.parse(profile.wallets);
-      return response.ok(undefined, profile);
+      profileNew.wallets = Wallets.parse(profile.wallets);
+      return response.ok(undefined, profileNew);
     })
     .catch((e) => response.error(e.message));
 };

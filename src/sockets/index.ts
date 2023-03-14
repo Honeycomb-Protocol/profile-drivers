@@ -74,7 +74,7 @@ export const startSocket = (honeycomb: Honeycomb, orm: MikroORM) => {
         const profileChain = ProfileChain.fromAccountInfo(
           account.accountInfo
         )[0];
-        console.log(`Found new profile ${account.accountId.toString()}`);
+        console.log(`Profile ${account.accountId.toString()} data changed`);
 
         await saveProfile(honeycomb, orm, account.accountId, profileChain);
       } catch {
@@ -84,6 +84,7 @@ export const startSocket = (honeycomb: Honeycomb, orm: MikroORM) => {
           }
 
           const userChain = UserChain.fromAccountInfo(account.accountInfo)[0];
+          console.log(`User ${account.accountId.toString()} data changed`);
 
           const profile = await orm.em.findOne(Profile, {
             useraddress: account.accountId,
@@ -96,7 +97,7 @@ export const startSocket = (honeycomb: Honeycomb, orm: MikroORM) => {
               secondary_wallets: userChain.secondaryWallets,
             }).toString();
 
-            orm.em.flush();
+            await orm.em.flush();
           }
         } catch {
           console.log(`${account.accountId} not matched any discriminator`);

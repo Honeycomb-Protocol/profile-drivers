@@ -5,7 +5,7 @@ export const connectDB = async (dbName: string) => {
   const orm = await MikroORM.init<SqliteDriver>({
     entities: ["./dist/models"], // path to our JS entities (dist), relative to `baseDir`
     entitiesTs: ["./src/models"], // path to our TS entities (src), relative to `baseDir`
-    dbName,
+    dbName: dbName + ".sqlite",
     type: "sqlite",
     allowGlobalContext: true,
   });
