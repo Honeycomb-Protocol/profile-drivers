@@ -12,6 +12,7 @@ import config, { getHoneycomb, twitterClient } from "./config";
 import { buildEntityRoute } from "./controllers/entity";
 import sessionStore from "./session-store";
 import { refreshData, startSocket } from "./sockets";
+import crons from "./crons";
 
 dotenv.config();
 
@@ -72,6 +73,7 @@ app.use(
   refreshData(honeycomb, orm, twitter).then((_) => startSocket(honeycomb, orm));
 
   app.use(routes);
+  crons();
 
   app.listen(port, () => {
     console.log(colors.green(`[server] Listening on port ${port}`));
@@ -82,7 +84,6 @@ app.use(
     const generator = orm.getSchemaGenerator();
     await generator.updateSchema();
     await orm.getMigrator().down();
-
     const countUser = await orm.em.count(models.Profile);
     const countStats = await orm.em.count(models.Stats);
     // const countWallet = await orm.em.count(models.Wallet);
