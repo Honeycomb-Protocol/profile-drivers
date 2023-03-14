@@ -41,8 +41,8 @@ const getProfiles: Handler = (req: Request, res) => {
         undefined,
         profiles.map((p) => {
           const profile = p.toJSON();
-          // //@ts-ignore
-          // profile.wallets = Wallets.parse(profile.wallets);
+          //@ts-ignore
+          profile.wallets = Wallets.parse(profile.wallets);
           return profile;
         })
       )
