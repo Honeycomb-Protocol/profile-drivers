@@ -3,13 +3,12 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import morgan from "morgan";
-import { PublicKey } from "@solana/web3.js";
 import colors from "colors";
 import routes from "./controllers";
 import * as models from "./models";
 import { connectDB } from "./utils";
 import { Request } from "./types";
-import { getHoneycomb } from "./config";
+import config, { getHoneycomb, twitterClient } from "./config";
 import { buildEntityRoute } from "./controllers/entity";
 import sessionStore from "./session-store";
 import { refreshData, startSocket } from "./sockets";
@@ -17,7 +16,7 @@ import { refreshData, startSocket } from "./sockets";
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = config.port;
 
 app.use(cors());
 
@@ -25,10 +24,10 @@ app.use(morgan("dev"));
 
 app.use(express.static("/"));
 
-app.use(express.json({ limit: process.env.REQUEST_LIMIT }));
+app.use(express.json({ limit: config.request_limit }));
 app.use(
   express.urlencoded({
-    limit: process.env.REQUEST_LIMIT,
+    limit: config.request_limit,
     extended: true,
   })
 );
@@ -45,29 +44,32 @@ app.use(
 );
 
 (async () => {
-  const orm = await connectDB(process.env.DB_NAME || "database_tmp");
+  const orm = await connectDB(config.db_name);
   const honeycomb = await getHoneycomb("devnet");
-
-  refreshData(honeycomb, orm).then((_) => startSocket(honeycomb, orm));
+  const twitter = twitterClient();
 
   app.use((req: Request, _res, next) => {
     req.orm = orm;
     req.honeycomb = honeycomb;
+    req.twitter = twitter;
     next();
   });
 
-  const entities: string[] = [];
   honeycomb.project().profileDataConfig.forEach((config, label) => {
     if (config.__kind === "Entity") {
+      const capitalizeLabel = label[0].toUpperCase() + label.slice(1);
       //@ts-ignore
-      if (!models[label])
-        throw new Error(`${label} entity does not have a defined model`);
-      entities.push(label);
+      if (!models[capitalizeLabel])
+        throw new Error(
+          `${capitalizeLabel} entity does not have a defined model`
+        );
 
       //@ts-ignore
       app.use("/entity/" + label, buildEntityRoute(models[label]));
     }
   });
+
+  refreshData(honeycomb, orm, twitter).then((_) => startSocket(honeycomb, orm));
 
   app.use(routes);
 

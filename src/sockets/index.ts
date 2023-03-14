@@ -9,13 +9,15 @@ import {
 } from "@honeycomb-protocol/hive-control";
 import { MikroORM } from "@mikro-orm/core";
 import { Profile, Wallets } from "../models";
+import Twitter from "twitter-lite";
+import { ITweet, Tweets } from "../models/Tweets";
 
-export const saveProfile = async (
+export async function saveProfile(
   honeycomb: Honeycomb,
   orm: MikroORM,
   profileAddress: web3.PublicKey,
   profileChain: ProfileChain
-) => {
+) {
   const count = await orm.em.count(Profile, {
     address: profileAddress,
   });
@@ -36,9 +38,9 @@ export const saveProfile = async (
     orm.em.persist(profile);
     await orm.em.flush();
   }
-};
+}
 
-export const refreshData = (honeycomb: Honeycomb, orm: MikroORM) => {
+export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
   console.log("Refreshing Profiles...");
   return ProfileChain.gpaBuilder()
     .addFilter("project", honeycomb.project().address)
@@ -60,9 +62,101 @@ export const refreshData = (honeycomb: Honeycomb, orm: MikroORM) => {
         })
       );
     });
-};
+}
 
-export const startSocket = (honeycomb: Honeycomb, orm: MikroORM) => {
+export async function fetchTweets(
+  honeycomb: Honeycomb,
+  orm: MikroORM,
+  twitter: Twitter
+) {
+  console.log("Refreshing Tweets...");
+
+  const profiles = await orm.em.find(Profile, {
+    // twitterId: {
+    //   $not: null,
+    // },
+  });
+
+  return Promise.all(
+    profiles.map(async (profile) => {
+      //@ts-ignore
+      const { primary_wallet } = Wallets.parse(profile.wallets);
+      const profileObj = await honeycomb
+        .identity()
+        .fetch()
+        .profile(undefined, primary_wallet);
+      const tweets = profileObj.entity<ITweet>("tweets");
+      tweets.setLeaves(
+        await orm.em
+          .find(Tweets, {
+            profile: {
+              address: profile.address,
+            },
+          })
+          .then((tweets) => tweets.map((t) => t.toJSON()))
+      );
+
+      twitter
+        .get(`users/1281956359538388992/tweets`)
+        // .get(`users/${profile.twitterId}/tweets`)
+        .then(async (tweetsRaw) => {
+          tweetsRaw.data.map(async (tweetRaw: any) => {
+            const dbTweet = await orm.em.findOne(Tweets, {
+              tweetId: tweetRaw.id,
+            });
+            const storedTweet = tweets.values.find(
+              (t) => t.tweetId == tweetRaw.id
+            );
+            let index = tweets.values.length;
+
+            try {
+              if (storedTweet) {
+                index = storedTweet.index;
+                await tweets.set(index, {
+                  index,
+                  tweetId: tweetRaw.id,
+                  text: tweetRaw.text,
+                });
+              } else {
+                await tweets.add({
+                  index,
+                  tweetId: tweetRaw.id,
+                  text: tweetRaw.text,
+                });
+              }
+
+              if (dbTweet) {
+                dbTweet.text = tweetRaw.text;
+              } else {
+                const newTweet = new Tweets(
+                  [profile.address, index],
+                  tweetRaw.id,
+                  tweetRaw.text
+                );
+                orm.em.persist(newTweet);
+              }
+            } catch (e) {
+              console.error(e);
+            }
+          });
+        })
+        .catch((e) => console.error(e));
+
+      return orm.em.flush();
+    })
+  );
+}
+
+export async function refreshData(
+  honeycomb: Honeycomb,
+  orm: MikroORM,
+  twitter: Twitter
+) {
+  await fetchProfiles(honeycomb, orm);
+  await fetchTweets(honeycomb, orm, twitter);
+}
+
+export function startSocket(honeycomb: Honeycomb, orm: MikroORM) {
   console.log("Started sockets...");
   return honeycomb.processedConnection.onProgramAccountChange(
     HIVECONTROL_PROGRAM_ID,
@@ -109,4 +203,4 @@ export const startSocket = (honeycomb: Honeycomb, orm: MikroORM) => {
       }
     }
   );
-};
+}

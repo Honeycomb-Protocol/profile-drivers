@@ -7,19 +7,30 @@ import {
   HoneycombProject,
   identityModule,
 } from "@honeycomb-protocol/hive-control";
+import Twitter from "twitter-lite";
 
 dotenv.config();
 
-export const PROD = process.env.PROD === "true";
+const config = {
+  node_env: process.env.NODE_ENV,
+  port: process.env.PORT || 4000,
+  cors_origin: process.env.CORS_ORIGIN || "*",
+  request_limit: process.env.REQUEST_LIMIT || "100kb",
+  jwt_secret: process.env.JWT_SECRET || "secret",
+  rpc_url: process.env.RPC_URL || "https://api.mainnet-beta.solana.com",
+  db_name: process.env.DB_NAME || "temp",
 
-const IDL: any = {};
+  twitter_consumer_key: process.env.TWITTER_API_KEY,
+  twitter_consumer_secret: process.env.TWITTER_SECRET,
+  twitter_access_token_key: process.env.TWITTER_ACCESS_TOKEN,
+  twitter_access_token_secret: process.env.TWITTER_ACCESS_TOKEN_SECRET,
+  twitter_bearer_token: process.env.TWITTER_BEARER_TOKEN,
+} as { [k: string]: string };
+export default config;
 
-const devnetRpc = "https://api.devnet.solana.com";
-const mainnetdRpc =
-  process.env.RPC_URL || "https://api.mainnet-beta.solana.com";
-
-const projects = JSON.parse(fs.readFileSync("./projects.json").toString());
-
+export const projects = JSON.parse(
+  fs.readFileSync("./projects.json").toString()
+);
 export async function getHoneycomb(
   projectName: string,
   opts?: web3.ConfirmOptions
@@ -27,8 +38,7 @@ export async function getHoneycomb(
   const project: Project = projects[projectName];
   if (!project) throw new Error("Project not found");
 
-  const RPC =
-    project.rpc || (projectName !== "devnet" ? mainnetdRpc : devnetRpc);
+  const RPC = project.rpc || config.rpc_url;
 
   if (!opts) {
     opts = {
@@ -49,4 +59,17 @@ export async function getHoneycomb(
   );
 
   return honeycomb;
+}
+
+export function twitterClient() {
+  return new Twitter({
+    subdomain: "api",
+    version: "2",
+    extension: false,
+    consumer_key: config.twitter_consumer_key,
+    consumer_secret: config.twitter_consumer_secret,
+    // bearer_token: config.twitter_bearer_token,
+    access_token_key: config.twitter_access_token_key,
+    access_token_secret: config.twitter_access_token_secret,
+  });
 }
