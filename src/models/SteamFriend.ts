@@ -4,10 +4,11 @@ import {
   Property,
 } from "@mikro-orm/core";
 import { PublicKey } from "@solana/web3.js";
-import { BaseEntity } from "../types/BaseEntity";
+import { BaseEntity, IBaseEntity } from "../types/BaseEntity";
 
 
-export interface ISteamFriend { 
+export type ISteamFriend = IBaseEntity & { 
+  index: number;
   steamId: string;
   relationship: string;
   friendSince: number;

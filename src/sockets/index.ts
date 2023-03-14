@@ -8,7 +8,8 @@ import {
   profileDiscriminator,
 } from "@honeycomb-protocol/hive-control";
 import { MikroORM } from "@mikro-orm/core";
-import { Profile, Wallets } from "../models";
+import { ISteamFriend, Profile, SteamFriend, Wallets } from "../models";
+import axios from "axios";
 
 export async function saveProfile(
   honeycomb: Honeycomb,
@@ -75,81 +76,100 @@ export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
     });
 }
 
+const waiting = (ms = 1000): Promise<boolean> => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(true)
+    }, ms)
+  })
+}
+
 export async function fetchFriendList(
   honeycomb: Honeycomb,
   orm: MikroORM,
-  profile: Profile
+  profile: Profile,
+
+
 ) {
   //@ts-ignore
-  // const { primary_wallet } = Wallets.parse(profile.wallets);
-  // const profileObj = await honeycomb
-  //   .identity()
-  //   .fetch()
-  //   .profile(undefined, primary_wallet);
-  // const tweets = profileObj.entity<ITweet>("tweets");
-  // tweets.setLeaves(
-  //   await orm.em
-  //     .find(
-  //       Tweets,
-  //       {
-  //         profile: {
-  //           address: profile.address,
-  //         },
-  //       },
-  //       {
-  //         orderBy: {
-  //           index: 1,
-  //         },
-  //       }
-  //     )
-  //     .then((tweets) => tweets.map((t) => t.toJSON()))
-  // );
+  const { primary_wallet } = Wallets.parse(profile.wallets);
+  const profileObj = await honeycomb
+    .identity()
+    .fetch()
+    .profile(undefined, primary_wallet);
+  const tree = profileObj.entity<ISteamFriend>("SteamFriend");
+  tree.setLeaves(
+    await orm.em
+      .find(
+        SteamFriend,
+        {
+          profile: {
+            address: profile.address,
+          },
+        },
+        {
+          orderBy: {
+            index: 1,
+          },
+        }
+      )
+      .then((rows) => rows.map((row) => row.toJSON() as ISteamFriend))
+  );
 
-  // const steamId = profileObj.get("steamId");
+  const steamId = profileObj.get("steamId");
 
-  // if (!steamId) return;
+  if (!steamId) return;
+        const url = `https://api.steampowered.com/ISteamUser/GetFriendList/v0001/?key=26A07FDD725167659002949B3113F460&steamid=${"76561199165742437" || profile.steamId}&relationship=friend`
+        console.log(url)
+  const friendList = await axios.get(url).then(res => (res.data.friendslist?.friends || []) as {
+    "steamid": string,
+    "relationship": string,
+    "friend_since": number
+    }[])
+  waiting()
+console.log(friendList)
+  for (let friend of friendList) {
+    let dataInDb = await orm.em.findOne(SteamFriend, {
+      profile,
+      steamId: friend.steamid,
+    });
+    
+    const leave = tree.values.find((t) => t.steamId == friend.steamid);
+    let index = tree.values.length;
+    let add;
+    if (dataInDb) {
+      if (leave) continue;
+      // dataInDb.text = tweetRaw.text;
+    } else {
+      add = true;
+      dataInDb = new SteamFriend(
+        [profile.address, index],
+        friend.steamid,
+        friend.relationship,
+        friend.friend_since,
+      );
+    }
 
-  // const tweetsRaw = await steam.get(`users/${steamId}/tweets`);
+    try {
+      if (leave) {
+        index = leave.index;
+        // await tree.set(index, {
+        //   index,
+        //   tweetId: friend.id,
+        //   text: friend.text,
+        // });
+      } else {
+        await tree.add(dataInDb.toJSON() as any);
+      }
+      if(add) orm.em.persist(dataInDb);
 
-  // for (let tweetRaw of tweetsRaw.data) {
-  //   const dbTweet = await orm.em.findOne(Tweets, {
-  //     tweetId: tweetRaw.id,
-  //   });
-  //   const storedTweet = tweets.values.find((t) => t.tweetId == tweetRaw.id);
-  //   let index = tweets.values.length;
+     
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
-  //   try {
-  //     if (storedTweet) {
-  //       index = storedTweet.index;
-  //       // await tweets.set(index, {
-  //       //   index,
-  //       //   tweetId: tweetRaw.id,
-  //       //   text: tweetRaw.text,
-  //       // });
-  //     } else {
-  //       await tweets.add({
-  //         index,
-  //         tweetId: tweetRaw.id,
-  //         text: tweetRaw.text,
-  //       });
-  //     }
-
-  //     if (dbTweet) {
-  //       dbTweet.text = tweetRaw.text;
-  //     } else {
-  //       const newTweet = new Tweets(
-  //         [profile.address, index],
-  //         tweetRaw.id,
-  //         tweetRaw.text
-  //       );
-  //       orm.em.persist(newTweet);
-  //     }
-  //   } catch (e) {
-  //     console.error(e);
-  //   }
-  // }
-
-  // return orm.em.flush();
+  return orm.em.flush();
 }
 
 export async function fetchAllEntitiesFor(
