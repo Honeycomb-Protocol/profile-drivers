@@ -4,6 +4,7 @@ import Twitter, { OauthToken, OauthTokenSecret } from "twitter-lite";
 import config from "../../config";
 import { ResponseHelper } from "../../utils";
 import { Profile, Wallets } from "../../models";
+import { fetchAllEntitiesFor } from "../../sockets";
 
 const router = express.Router();
 
@@ -43,6 +44,13 @@ router.get("/callback", async (req: Request, res: Response) => {
   if (!profile) {
     return response.error("Profile not found!");
   }
+
+  if (profile.twitterId || profile.twitterUsername) {
+    return response.conflict(
+      "Twitter credentials already set for this profile"
+    );
+  }
+
   try {
     const { oauth_verifier, oauth_token } = req.query as {
       [k: string]: string;
@@ -69,14 +77,25 @@ router.get("/callback", async (req: Request, res: Response) => {
       .fetch()
       .profile(req.honeycomb.project().address, primary_wallet);
 
-    await profileChain.add("twitterUsername", user.screen_name);
-    await profileChain.add("twitterId", user.id_str);
+    await profileChain
+      .add("twitterUsername", user.screen_name)
+      .then((_) => {
+        profile.twitterId = user.id_str;
+      })
+      .catch();
 
-    profile.twitterId = user.id_str;
-    profile.twitterUsername = user.screen_name;
+    await profileChain
+      .add("twitterId", user.id_str)
+      .then((_) => {
+        profile.twitterUsername = user.screen_name;
+      })
+      .catch();
+
     req.session.twUser = user;
     await req.orm.em.flush();
-    // console.log("user", user);
+
+    await fetchAllEntitiesFor(req.honeycomb, req.orm, req.twitter, profile);
+
     response.ok("Tw Auth Success!");
   } catch (err) {
     console.error(err);

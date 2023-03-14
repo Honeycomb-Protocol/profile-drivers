@@ -78,87 +78,100 @@ export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
 export async function fetchTweets(
   honeycomb: Honeycomb,
   orm: MikroORM,
+  twitter: Twitter,
+  profile: Profile
+) {
+  //@ts-ignore
+  const { primary_wallet } = Wallets.parse(profile.wallets);
+  const profileObj = await honeycomb
+    .identity()
+    .fetch()
+    .profile(undefined, primary_wallet);
+  const tweets = profileObj.entity<ITweet>("tweets");
+  tweets.setLeaves(
+    await orm.em
+      .find(
+        Tweets,
+        {
+          profile: {
+            address: profile.address,
+          },
+        },
+        {
+          orderBy: {
+            index: 1,
+          },
+        }
+      )
+      .then((tweets) => tweets.map((t) => t.toJSON()))
+  );
+
+  const twitterId = profileObj.get("twitterId");
+
+  if (!twitterId) return;
+
+  const tweetsRaw = await twitter.get(`users/${twitterId}/tweets`);
+
+  for (let tweetRaw of tweetsRaw.data) {
+    const dbTweet = await orm.em.findOne(Tweets, {
+      tweetId: tweetRaw.id,
+    });
+    const storedTweet = tweets.values.find((t) => t.tweetId == tweetRaw.id);
+    let index = tweets.values.length;
+
+    try {
+      if (storedTweet) {
+        index = storedTweet.index;
+        // await tweets.set(index, {
+        //   index,
+        //   tweetId: tweetRaw.id,
+        //   text: tweetRaw.text,
+        // });
+      } else {
+        await tweets.add({
+          index,
+          tweetId: tweetRaw.id,
+          text: tweetRaw.text,
+        });
+      }
+
+      if (dbTweet) {
+        dbTweet.text = tweetRaw.text;
+      } else {
+        const newTweet = new Tweets(
+          [profile.address, index],
+          tweetRaw.id,
+          tweetRaw.text
+        );
+        orm.em.persist(newTweet);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  return orm.em.flush();
+}
+
+export async function fetchAllEntitiesFor(
+  honeycomb: Honeycomb,
+  orm: MikroORM,
+  twitter: Twitter,
+  profile: Profile
+) {
+  // All Entities for this profile will be fetched here
+  await fetchTweets(honeycomb, orm, twitter, profile);
+}
+
+export async function fetchAllEntitiesForAllUser(
+  honeycomb: Honeycomb,
+  orm: MikroORM,
   twitter: Twitter
 ) {
-  console.log("Refreshing Tweets...");
-
-  const profiles = await orm.em.find(Profile, {
-    // twitterId: {
-    //   $not: null,
-    // },
-  });
+  const profiles = await orm.em.find(Profile, {});
 
   for (let profile of profiles) {
-    // @ts-ignore
-    const { primary_wallet } = Wallets.parse(profile.wallets);
-    const profileObj = await honeycomb
-      .identity()
-      .fetch()
-      .profile(undefined, primary_wallet);
-    const tweets = profileObj.entity<ITweet>("tweets");
-    tweets.setLeaves(
-      await orm.em
-        .find(
-          Tweets,
-          {
-            profile: {
-              address: profile.address,
-            },
-          },
-          {
-            orderBy: {
-              index: 1,
-            },
-          }
-        )
-        .then((tweets) => tweets.map((t) => t.toJSON()))
-    );
-
-    const twitterId = profileObj.get("twitterId");
-
-    if (!twitterId) continue;
-
-    const tweetsRaw = await twitter.get(`users/${twitterId}/tweets`);
-
-    for (let tweetRaw of tweetsRaw.data) {
-      const dbTweet = await orm.em.findOne(Tweets, {
-        tweetId: tweetRaw.id,
-      });
-      const storedTweet = tweets.values.find((t) => t.tweetId == tweetRaw.id);
-      let index = tweets.values.length;
-
-      try {
-        if (storedTweet) {
-          index = storedTweet.index;
-          // await tweets.set(index, {
-          //   index,
-          //   tweetId: tweetRaw.id,
-          //   text: tweetRaw.text,
-          // });
-        } else {
-          await tweets.add({
-            index,
-            tweetId: tweetRaw.id,
-            text: tweetRaw.text,
-          });
-        }
-
-        if (dbTweet) {
-          dbTweet.text = tweetRaw.text;
-        } else {
-          const newTweet = new Tweets(
-            [profile.address, index],
-            tweetRaw.id,
-            tweetRaw.text
-          );
-          orm.em.persist(newTweet);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    await orm.em.flush();
+    await fetchAllEntitiesFor(honeycomb, orm, twitter, profile);
   }
 }
 
@@ -168,7 +181,7 @@ export async function refreshData(
   twitter: Twitter
 ) {
   await fetchProfiles(honeycomb, orm);
-  await fetchTweets(honeycomb, orm, twitter);
+  await fetchAllEntitiesForAllUser(honeycomb, orm, twitter);
 }
 
 export function startSocket(honeycomb: Honeycomb, orm: MikroORM) {
