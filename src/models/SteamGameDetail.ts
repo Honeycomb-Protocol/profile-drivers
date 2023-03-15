@@ -1,4 +1,4 @@
-import { Cascade, Entity, ManyToOne, Property } from '@mikro-orm/core'
+import { Entity, ManyToOne, PrimaryKey, Property, Ref } from '@mikro-orm/core'
 import { PublicKey } from '@solana/web3.js'
 import { BaseEntity } from '../types/BaseEntity'
 import { SteamGame } from './SteamGame'
@@ -15,11 +15,17 @@ export interface ISteamGameDetail {
 }
 @Entity()
 export class SteamGameDetail extends BaseEntity<SteamGameDetail> {
-  @ManyToOne(() => SteamGame, {
-    cascade: [Cascade.PERSIST, Cascade.REMOVE],
+  @PrimaryKey()
+  appId!: number;
+  
+
+  @ManyToOne("SteamGame", {
+    joinColumn: "appId", 
+    referenceColumnName: "appId", 
+    mapToPk: true, 
     nullable: true,
   })
-  appId?: SteamGame
+  steamGame?: Ref<"SteamGame">;
 
   @Property()
   totalPlayTimeHours!: number
@@ -44,6 +50,7 @@ export class SteamGameDetail extends BaseEntity<SteamGameDetail> {
 
   constructor(
     [profile_address, index]: [PublicKey, number],
+    appId: number,
     totalPlayTimeHours: number,
     lastPlayedDate: number,
     singleGameTotalPlayTime: number,
@@ -52,7 +59,8 @@ export class SteamGameDetail extends BaseEntity<SteamGameDetail> {
     kdratio: number,
     matches: number,
   ) {
-    super(profile_address, index)
+    super(profile_address, index);
+    this.appId = appId
     this.totalPlayTimeHours = totalPlayTimeHours
     this.lastPlayedDate = lastPlayedDate
     this.singleGameTotalPlayTime = singleGameTotalPlayTime

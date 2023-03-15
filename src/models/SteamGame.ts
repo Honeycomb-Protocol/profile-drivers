@@ -1,22 +1,31 @@
+import { SteamGameDetail } from './SteamGameDetail';
 import {
     Entity,
     PrimaryKey,
     BaseEntity,
     Property,
+    Collection,
+    OneToMany,
 } from "@mikro-orm/core";
-import { PublicKey } from "@solana/web3.js";
 
 export interface ISteamGame { 
-    _appId: PublicKey;
+    appId: number;
     gameImage: string;
     gameName: string;
 }
 
 @Entity()
-export class SteamGame extends BaseEntity<SteamGame, "_appId"> {
+export class SteamGame extends BaseEntity<SteamGame, "appId"> {
     @PrimaryKey()
-    _appId!: PublicKey;
+    appId!: number;
 
+
+//   @OneToMany(() => Stats, (stats) => stats.profile)
+//   stats = new Collection<Stats>(this);
+    
+    @OneToMany("SteamGameDetail", "steamGame")
+    app = new Collection<SteamGameDetail>(this);
+    
     @Property()
     gameImage!: string;
 
@@ -24,9 +33,9 @@ export class SteamGame extends BaseEntity<SteamGame, "_appId"> {
     gameName!: string;
 
 
-    constructor(_appId: PublicKey, gameImage: string, gameName: string) {
+    constructor(_appId: number, gameImage: string, gameName: string) {
         super();
-        this._appId = _appId;
+        this.appId = _appId;
         this.gameImage = gameImage;
         this.gameName = gameName;
     }

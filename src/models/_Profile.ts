@@ -7,7 +7,6 @@ import {
   BaseEntity,
 } from "@mikro-orm/core";
 import { PublicKey } from "@solana/web3.js";
-import { Stats } from "./Stats";
 
 export interface IWallets {
   primary_wallet: PublicKey;
@@ -71,9 +70,6 @@ export class Profile
   implements IProfile {
   @PrimaryKey()
   address!: PublicKey;
-
-  @OneToMany(() => Stats, (stats) => stats.profile)
-  stats = new Collection<Stats>(this);
 
   @Property()
   useraddress!: PublicKey;

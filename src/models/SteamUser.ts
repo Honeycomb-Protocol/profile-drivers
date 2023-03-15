@@ -24,7 +24,6 @@ export class SteamUser extends BaseEntity<SteamUser, "steamId"> {
     @Property()
     name!: string;
 
-
     @Property()
     level!: number;
 

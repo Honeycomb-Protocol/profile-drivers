@@ -1,11 +1,12 @@
 import {
+    BaseEntity,
     Cascade,
     Entity,
     ManyToOne,
+    PrimaryKey,
     Property,
 } from "@mikro-orm/core";
 import { PublicKey } from "@solana/web3.js";
-import { BaseEntity } from "../types/BaseEntity";
 import { SteamGame } from "./SteamGame";
 
 export interface ISteamGameCollectible {
@@ -13,10 +14,13 @@ export interface ISteamGameCollectible {
     image: string;
     name: string;
     category: string;
+    classId: string;
 }
 
 @Entity()
-export class SteamGameCollectible extends BaseEntity<SteamGameCollectible> {
+export class SteamGameCollectible extends BaseEntity<SteamGameCollectible, 'classId'> {
+    @PrimaryKey()
+    classId!: string;
 
     @ManyToOne(() => SteamGame, {
         cascade: [Cascade.PERSIST, Cascade.REMOVE],
@@ -35,12 +39,11 @@ export class SteamGameCollectible extends BaseEntity<SteamGameCollectible> {
 
 
     constructor(
-        [profile_address, index]: [PublicKey, number],
         image: string,
         name: string,
         category: string,
     ) {
-        super(profile_address, index);
+        super();
         this.image = image;
         this.name = name;
         this.category = category;

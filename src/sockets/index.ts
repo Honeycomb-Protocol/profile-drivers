@@ -127,7 +127,6 @@ export async function fetchFriendList(
     "friend_since": number
     }[])
   waiting()
-console.log(friendList)
   for (let friend of friendList) {
     let dataInDb = await orm.em.findOne(SteamFriend, {
       profile,
