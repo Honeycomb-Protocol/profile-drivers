@@ -4,9 +4,9 @@ import {
   Property,
 } from "@mikro-orm/core";
 import { PublicKey } from "@solana/web3.js";
-import { BaseEntity } from "../types/BaseEntity";
+import { BaseEntity, IBaseEntity } from "../types/BaseEntity";
 
-export interface ISteamDomainUser {
+export interface ISteamDomainUser extends IBaseEntity {
   steamId: string;
   userName: string;
   userImage: string;

@@ -1,10 +1,11 @@
 import { Entity, ManyToOne, PrimaryKey, Property, Ref } from '@mikro-orm/core'
 import { PublicKey } from '@solana/web3.js'
-import { BaseEntity } from '../types/BaseEntity'
+import { BaseEntity, IBaseEntity } from '../types/BaseEntity'
 import { SteamGame } from './SteamGame'
 
-export interface ISteamGameDetail {
-  appId: SteamGame
+export interface ISteamOwnedGames extends IBaseEntity {
+  appId: number
+  steamGame?: SteamGame,
   totalPlayTimeHours: number
   lastPlayedDate: number
   singleGameTotalPlayTime: number
@@ -14,10 +15,9 @@ export interface ISteamGameDetail {
   matches: number
 }
 @Entity()
-export class SteamGameDetail extends BaseEntity<SteamGameDetail> {
-  @PrimaryKey()
+export class SteamOwnedGames extends BaseEntity<SteamOwnedGames> {
+  @Property()
   appId!: number;
-  
 
   @ManyToOne("SteamGame", {
     joinColumn: "appId", 

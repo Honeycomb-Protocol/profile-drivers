@@ -35,11 +35,11 @@ router.get("/callback", async (req: Request, res: Response) => {
         return response.error("Profile not found!");
     }
     console.log(profile)
-    // if (profile.steamId || profile.steamUsername) {
-    //     return response.conflict(
-    //         "Steam credentials already set for this profile"
-    //     );
-    // }
+    if (profile.steamId || profile.steamUsername) {
+        return response.conflict(
+            "Steam credentials already set for this profile"
+        );
+    }
     try {
         const user = await req.steam.authenticate(req);
 

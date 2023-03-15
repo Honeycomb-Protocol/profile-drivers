@@ -6,8 +6,7 @@ import {
 import { PublicKey } from "@solana/web3.js";
 import { BaseEntity, IBaseEntity } from "../types/BaseEntity";
 
-
-export type ISteamFriend = IBaseEntity & { 
+export interface ISteamFriend extends IBaseEntity {
   index: number;
   steamId: string;
   relationship: string;

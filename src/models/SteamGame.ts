@@ -1,11 +1,11 @@
-import { SteamGameDetail } from './SteamGameDetail';
+import { SteamOwnedGames } from './SteamOwnedGames';
 import {
     Entity,
     PrimaryKey,
-    BaseEntity,
     Property,
     Collection,
     OneToMany,
+    BaseEntity,
 } from "@mikro-orm/core";
 
 export interface ISteamGame { 
@@ -23,15 +23,14 @@ export class SteamGame extends BaseEntity<SteamGame, "appId"> {
 //   @OneToMany(() => Stats, (stats) => stats.profile)
 //   stats = new Collection<Stats>(this);
     
-    @OneToMany("SteamGameDetail", "steamGame")
-    app = new Collection<SteamGameDetail>(this);
+    @OneToMany("SteamOwnedGames", "steamGame")
+    app = new Collection<SteamOwnedGames>(this);
     
     @Property()
     gameImage!: string;
 
     @Property()
     gameName!: string;
-
 
     constructor(_appId: number, gameImage: string, gameName: string) {
         super();
