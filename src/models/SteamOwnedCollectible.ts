@@ -8,19 +8,23 @@ import {
 import { BaseEntity, IBaseEntity } from "../types/BaseEntity";
 import { SteamGame } from "./SteamGame";
 import { PublicKey } from '@solana/web3.js'
-
+// "appid": 730,
+// "contextid": "2",
+// "assetId": "29128402143",
+// "classId": "4901046679",
+// "instanceid": "0",
+// "amount": "1"
 export interface ISteamGameCollectible extends IBaseEntity {
-    appId: SteamGame;
-    image: string;
-    name: string;
-    category: string;
+    appId: number;
     classId: string;
+    assetId: string;
+    amount: string;
 }
 
 @Entity()
 export class SteamOwnedCollectible extends BaseEntity<SteamOwnedCollectible> {
     @Property()
-    appId!: string;
+    appId!: number;
   
     @ManyToOne("SteamGame", {
       joinColumn: "appId", 
@@ -31,14 +35,14 @@ export class SteamOwnedCollectible extends BaseEntity<SteamOwnedCollectible> {
     steamGame?: Ref<"SteamGame">;
     
     @Property()
-    assetid!: string;
+    assetId!: string;
     
     @Property()
-    classid!: string;
+    classId!: string;
     
     @ManyToOne("SteamAssetClassInfo", {
-        joinColumn: "classid", 
-        referenceColumnName: "classid", 
+        joinColumn: "classId", 
+        referenceColumnName: "classId", 
         mapToPk: true, 
         nullable: true,
     })
@@ -47,29 +51,19 @@ export class SteamOwnedCollectible extends BaseEntity<SteamOwnedCollectible> {
     @Property()
     amount!: string;
 
-    @Property()
-    name!: string;
-
-    @Property()
-    category!: string;
-
 
     constructor(
         [profile_address, index]: [PublicKey, number],
 
-        appId: string,
-        assetid: string,
-        classid: string,
+        appId: number,
+        assetId: string,
+        classId: string,
         amount: string,
-        name: string,
-        category: string,
     ) {
         super(profile_address, index);
         this.appId = appId;
-        this.assetid = assetid;
-        this.classid = classid;
+        this.assetId = assetId;
+        this.classId = classId;
         this.amount = amount;
-        this.name = name;
-        this.category = category;
     }
 }

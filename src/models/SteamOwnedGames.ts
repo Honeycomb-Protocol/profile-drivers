@@ -6,13 +6,11 @@ import { SteamGame } from './SteamGame'
 export interface ISteamOwnedGames extends IBaseEntity {
   appId: number
   steamGame?: SteamGame,
-  totalPlayTimeHours: number
-  lastPlayedDate: number
-  singleGameTotalPlayTime: number
-  singleGameLastPlayedDate: number
-  winRatioPercent: number
-  kdratio: number
-  matches: number
+  playtimeForever: number
+  rTimeLastPlayed: number
+  playTimeWindowsForever: number
+  playTimeMacForever: number
+  playTimeLinuxForever: number
 }
 @Entity()
 export class SteamOwnedGames extends BaseEntity<SteamOwnedGames> {
@@ -28,45 +26,37 @@ export class SteamOwnedGames extends BaseEntity<SteamOwnedGames> {
   steamGame?: Ref<"SteamGame">;
 
   @Property()
-  totalPlayTimeHours!: number
+  playtimeForever!: number
 
   @Property()
-  lastPlayedDate!: number
+  rTimeLastPlayed!: number
+
 
   @Property()
-  singleGameTotalPlayTime!: number
+  playTimeWindowsForever!: number
 
   @Property()
-  singleGameLastPlayedDate!: number
+  playTimeMacForever!: number
 
   @Property()
-  winRatioPercent!: number
+  playTimeLinuxForever!: number
 
-  @Property()
-  kdratio!: number
-
-  @Property()
-  matches!: number
 
   constructor(
     [profile_address, index]: [PublicKey, number],
     appId: number,
-    totalPlayTimeHours: number,
-    lastPlayedDate: number,
-    singleGameTotalPlayTime: number,
-    singleGameLastPlayedDate: number,
-    winRatioPercent: number,
-    kdratio: number,
-    matches: number,
+    playtimeForever: number,
+    rTimeLastPlayed: number,
+    playTimeWindowsForever: number,
+    playTimeMacForever: number,
+    playTimeLinuxForever: number,
   ) {
     super(profile_address, index);
     this.appId = appId
-    this.totalPlayTimeHours = totalPlayTimeHours
-    this.lastPlayedDate = lastPlayedDate
-    this.singleGameTotalPlayTime = singleGameTotalPlayTime
-    this.singleGameLastPlayedDate = singleGameLastPlayedDate
-    this.winRatioPercent = winRatioPercent
-    this.kdratio = kdratio
-    this.matches = matches
+    this.playtimeForever = playtimeForever
+    this.rTimeLastPlayed = rTimeLastPlayed
+    this.playTimeWindowsForever = playTimeWindowsForever
+    this.playTimeMacForever = playTimeMacForever
+    this.playTimeLinuxForever = playTimeLinuxForever
   }
 }

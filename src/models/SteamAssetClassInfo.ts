@@ -10,7 +10,7 @@ import {
 import { SteamOwnedCollectible } from "./SteamOwnedCollectible";
 
 export interface ISteamAssetClassInfo {
-    classid: string;
+    classId: string;
     image: string;
     name: string;
     level?: number;
@@ -18,9 +18,9 @@ export interface ISteamAssetClassInfo {
 }
 
 @Entity()
-export class SteamAssetClassInfo extends BaseEntity<SteamAssetClassInfo, "classid"> {
+export class SteamAssetClassInfo extends BaseEntity<SteamAssetClassInfo, "classId"> {
     @PrimaryKey()
-    classid!: string;
+    classId!: string;
 
     @Property()
     icon_url!: string;
@@ -34,9 +34,9 @@ export class SteamAssetClassInfo extends BaseEntity<SteamAssetClassInfo, "classi
     @OneToMany("SteamOwnedCollectible", "asset")
     ownedBy = new Collection<SteamOwnedCollectible>(this);
     
-    constructor(classid: string, icon_url: string, name: string, type: string) {
+    constructor(classId: string, icon_url: string, name: string, type: string) {
         super();
-        this.classid = classid;
+        this.classId = classId;
         this.icon_url = icon_url;
         this.name = name;
         this.type = type;

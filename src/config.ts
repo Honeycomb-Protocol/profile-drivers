@@ -5,6 +5,7 @@ import { Project } from "./types";
 import {
   Honeycomb,
   HoneycombProject,
+  httpModule,
   identityModule,
 } from "@honeycomb-protocol/hive-control";
 import SteamAuth from 'node-steam-openid';
@@ -52,6 +53,10 @@ export async function getHoneycomb(
       new web3.PublicKey(project.address)
     )
   );
+
+  honeycomb.use(
+    httpModule("")
+  )
 
   return honeycomb;
 }
