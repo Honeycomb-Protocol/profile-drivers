@@ -13,6 +13,7 @@ import { MikroORM } from "@mikro-orm/core";
 import { ISteamFriend, ISteamGame, ISteamGameCollectible, Profile, SteamFriend, SteamGame, SteamOwnedCollectible, SteamOwnedGames, Wallets } from "../models";
 import axios from "axios";
 import { ISteamUser, SteamUser } from "../models/SteamUser";
+import { SteamAssetClassInfo } from '../models/SteamAssetClassInfo';
 const testingUser = null;
 
 interface ISteamOwnedGamesApi {
@@ -175,7 +176,7 @@ export async function fetchCollectible(
   honeycomb: Honeycomb,
   orm: MikroORM,
   profile: Profile,
-  appId: number,
+  game: SteamOwnedGames,
 ) {
   //@ts-ignore
   const { primary_wallet } = Wallets.parse(profile.wallets);
@@ -205,8 +206,8 @@ export async function fetchCollectible(
   const steamId = profileObj.get("steamId");
 
   if (!steamId) return;
-  const url = `https://steamcommunity.com/inventory/${testingUser || profile.steamId}/${appId || 730}/2?l=english`
-  const collectibleList = await honeycomb.http().get(url).then(res => (res.data.friendslist?.friends || []) as {
+  const url = `https://steamcommunity.com/inventory/${testingUser || profile.steamId}/${game.appId || 730}/2?l=english`
+  const collectibleList = await honeycomb.http().get(url).then(res => (res.data.assets || []) as {
     "appid": number,
     "contextid": string,
     "assetid": string,
@@ -338,7 +339,7 @@ export async function fetchOwnedGamesDetails(
     const leave = tree.values.find((t) => t.appId == ownGame.appid);
     let index = tree.values.length;
     let add;
-    
+
     if (!dataInDbDetail) {
       dataInDbDetail = new SteamGame(
         ownGame.appid,
@@ -420,7 +421,59 @@ export async function ensureSteamUsersInDb(
     }[]));
     console.log(userSteamSummaries)
     for (let summary of userSteamSummaries) {
-      const steamUser = new SteamUser(summary.steamid || "", summary.avatar || "",  summary.realname || summary.personaname || "", summary.loccountrycode || "", summary.level,)
+      const steamUser = new SteamUser(summary.steamid || "", summary.avatar || "", summary.realname || summary.personaname || "", summary.loccountrycode || "", summary.level,)
+      orm.em.persist(steamUser);
+    }
+    waiting(500);
+  }
+  return orm.em.flush();
+}
+export async function ensureSteamGameCollectiblesAssetsInDb(
+  orm: MikroORM,
+) {
+  const idsSet = new Set<string>();
+  const idsAppSet = new Set<number>();
+  (await orm.em.find(SteamOwnedCollectible, {
+  }, {
+    fields: ["classId"]
+  })).forEach(v => {
+    if (v.classId)
+      idsSet.add(v.classId);
+
+  });
+  // (await orm.em.find(Profile, {
+  // }, {
+  //   fields: ["steamId"]
+  // })).forEach(v => {
+  //   if (v.steamId)
+  //     idsSet.add(v.steamId);
+  // });
+  (await orm.em.find(SteamAssetClassInfo, {
+    classId: {
+      $in: Array.from(idsSet)
+    },
+
+  }, {
+    fields: ["classId"]
+  })).forEach(v => {
+    idsSet.delete(v.classId);
+  });
+  let ids = Array.from(idsSet);
+  if (!ids.length) return;
+  for (let index = 0; index < ids.length / 100; index++) {
+    const url = `https://api.steampowered.com/ISteamEconomy/GetAssetClassInfo/v1/?key=${config.steam_api_key}0&appid=730&class_count=2&classid0=4717330486&classid1=4901046679&language=en`
+    console.log(url)
+    const userSteamSummaries = await axios.get(url).then(res => ((res.data.response?.players) as {
+      steamid: string;
+      avatar: string;
+      personaname: string;
+      realname: string;
+      level: number;
+      loccountrycode: string;
+    }[]));
+    console.log(userSteamSummaries)
+    for (let summary of userSteamSummaries) {
+      const steamUser = new SteamUser(summary.steamid || "", summary.avatar || "", summary.realname || summary.personaname || "", summary.loccountrycode || "", summary.level,)
       orm.em.persist(steamUser);
     }
     waiting(500);
@@ -439,6 +492,30 @@ export async function fetchAllEntitiesFor(
   await fetchOwnedGamesDetails(honeycomb, orm, profile);
 }
 
+export async function fetchAllEntitiesForGame(
+  honeycomb: Honeycomb,
+  orm: MikroORM,
+  profile: Profile,
+  game: SteamOwnedGames) {
+  // All Entities for this game will be fetched here
+  await fetchCollectible(honeycomb, orm, profile, game);
+}
+
+export async function fetchAllEntitiesForAllGame(
+  honeycomb: Honeycomb,
+  orm: MikroORM,
+  profile: Profile,
+) {
+  const games = await orm.em.find(SteamOwnedGames, {
+    profile: {
+      address: profile.address,
+    }
+  });
+  for (let game of games) {
+    await fetchAllEntitiesForGame(honeycomb, orm, profile, game);
+  }
+}
+
 export async function fetchAllEntitiesForAllUser(
   honeycomb: Honeycomb,
   orm: MikroORM
@@ -447,6 +524,7 @@ export async function fetchAllEntitiesForAllUser(
 
   for (let profile of profiles) {
     await fetchAllEntitiesFor(honeycomb, orm, profile);
+    await fetchAllEntitiesForAllGame(honeycomb, orm, profile);
   }
 }
 
