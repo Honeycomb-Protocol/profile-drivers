@@ -1,4 +1,3 @@
-import * as web3 from "@solana/web3.js"
 import {
     Entity,
     PrimaryKey,
@@ -6,15 +5,17 @@ import {
     Property,
     OneToMany,
     Collection,
+    ManyToOne,
+    Ref,
 } from "@mikro-orm/core";
 import { SteamOwnedCollectible } from "./SteamOwnedCollectible";
 
 export interface ISteamAssetClassInfo {
     classId: string;
-    image: string;
+    iconUrl: string;
     name: string;
-    level?: number;
-    loccountrycode: string;
+    type: number;
+    ownedBy: number;
 }
 
 @Entity()
@@ -23,7 +24,18 @@ export class SteamAssetClassInfo extends BaseEntity<SteamAssetClassInfo, "classI
     classId!: string;
 
     @Property()
-    icon_url!: string;
+    iconUrl!: string;
+
+    @Property()
+    app_id!: number;
+  
+    @ManyToOne("SteamGame", {
+      joinColumn: "app_id", 
+      referenceColumnName: "app_id", 
+      mapToPk: true, 
+      nullable: true,
+    })
+    steamGame?: Ref<"SteamGame">;
 
     @Property()
     name!: string;
@@ -33,11 +45,12 @@ export class SteamAssetClassInfo extends BaseEntity<SteamAssetClassInfo, "classI
 
     @OneToMany("SteamOwnedCollectible", "asset")
     ownedBy = new Collection<SteamOwnedCollectible>(this);
-    
-    constructor(classId: string, icon_url: string, name: string, type: string) {
+
+    constructor(classId: string, app_id: number, iconUrl: string, name: string, type: string) {
         super();
         this.classId = classId;
-        this.icon_url = icon_url;
+        this.app_id = app_id;
+        this.iconUrl = iconUrl;
         this.name = name;
         this.type = type;
     }

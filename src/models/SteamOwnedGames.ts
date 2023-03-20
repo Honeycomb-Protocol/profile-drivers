@@ -1,10 +1,10 @@
 import { Entity, ManyToOne, PrimaryKey, Property, Ref } from '@mikro-orm/core'
 import { PublicKey } from '@solana/web3.js'
-import { BaseEntity, IBaseEntity } from '../types/BaseEntity'
+import { ProvableEntity, IProvableEntity } from '../types/ProvableEntity'
 import { SteamGame } from './SteamGame'
 
-export interface ISteamOwnedGames extends IBaseEntity {
-  appId: number
+export interface ISteamOwnedGames extends IProvableEntity {
+  app_id: number
   steamGame?: SteamGame,
   playtimeForever: number
   rTimeLastPlayed: number
@@ -13,13 +13,13 @@ export interface ISteamOwnedGames extends IBaseEntity {
   playTimeLinuxForever: number
 }
 @Entity()
-export class SteamOwnedGames extends BaseEntity<SteamOwnedGames> {
+export class SteamOwnedGames extends ProvableEntity<SteamOwnedGames> {
   @Property()
-  appId!: number;
+  app_id!: number;
 
   @ManyToOne("SteamGame", {
-    joinColumn: "appId", 
-    referenceColumnName: "appId", 
+    joinColumn: "app_id", 
+    referenceColumnName: "app_id", 
     mapToPk: true, 
     nullable: true,
   })
@@ -44,7 +44,7 @@ export class SteamOwnedGames extends BaseEntity<SteamOwnedGames> {
 
   constructor(
     [profile_address, index]: [PublicKey, number],
-    appId: number,
+    app_id: number,
     playtimeForever: number,
     rTimeLastPlayed: number,
     playTimeWindowsForever: number,
@@ -52,7 +52,7 @@ export class SteamOwnedGames extends BaseEntity<SteamOwnedGames> {
     playTimeLinuxForever: number,
   ) {
     super(profile_address, index);
-    this.appId = appId
+    this.app_id = app_id
     this.playtimeForever = playtimeForever
     this.rTimeLastPlayed = rTimeLastPlayed
     this.playTimeWindowsForever = playTimeWindowsForever

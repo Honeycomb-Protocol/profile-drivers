@@ -27,6 +27,43 @@ interface ISteamOwnedGamesApi {
   "rtime_last_played": number
 }
 
+interface IAssetClassInfoApi {
+  [key: string]: {
+    "icon_url": string,
+    "icon_url_large": string,
+    "icon_drag_url": string,
+    "name": string,
+    "market_hash_name": string,
+    "market_name": string,
+    "name_color": string,
+    "background_color": string,
+    "type": string,
+    "tradable": string,
+    "marketable": string,
+    "commodity": string,
+    "market_tradable_restriction": string,
+    "market_buy_country_restriction": string,
+    "fraudwarnings": string,
+    "descriptions": {
+      [key: string]: {
+        type: number,
+        value: string,
+        app_data: string
+      }
+    },
+    "owner_descriptions": string,
+    "tags": {
+      [key: string]: {
+        internal_name: string,
+        name: string,
+        category: string,
+        category_name: string
+      }
+    },
+    "classid": string
+  },
+}
+
 export async function saveProfile(
   honeycomb: Honeycomb,
   orm: MikroORM,
@@ -134,11 +171,13 @@ export async function fetchFriendList(
 
   if (!steamId) return;
   const url = `https://api.steampowered.com/ISteamUser/GetFriendList/v0001/?key=${config.steam_api_key}&steamid=${testingUser || profile.steamId}&relationship=friend`
-  const friendList = await honeycomb.http().get(url).then(res => (res.data.friendslist?.friends || []) as {
-    "steamid": string,
-    "relationship": string,
-    "friend_since": number
-  }[])
+  const friendList = await honeycomb.http().get(url).then(res => {
+    return (res.friendslist?.friends || []) as {
+      "steamid": string,
+      "relationship": string,
+      "friend_since": number
+    }[]
+  })
   console.log(friendList)
   for (let friend of friendList) {
     let dataInDb = await orm.em.findOne(SteamFriend, {
@@ -168,8 +207,8 @@ export async function fetchFriendList(
     } catch (e) {
       console.error(e);
     }
+    await waiting(1000)
   }
-
   return orm.em.flush();
 }
 export async function fetchCollectible(
@@ -206,7 +245,7 @@ export async function fetchCollectible(
   const steamId = profileObj.get("steamId");
 
   if (!steamId) return;
-  const url = `https://steamcommunity.com/inventory/${testingUser || profile.steamId}/${game.appId || 730}/2?l=english`
+  const url = `https://steamcommunity.com/inventory/${testingUser || profile.steamId}/${game.app_id || 730}/2?l=english&key=${config.steam_api_key || ""}`
   const collectibleList = await honeycomb.http().get(url).then(res => (res.data.assets || []) as {
     "appid": number,
     "contextid": string,
@@ -214,14 +253,17 @@ export async function fetchCollectible(
     "classid": string,
     "instanceid": string,
     "amount": string
-  }[])
-  console.log(collectibleList)
+  }[]).catch(e => {
+    if (game.app_id == 730) console.log("err", e.response.statusText)
+    return [];
+  })
+  console.log(collectibleList, game.app_id)
   for (let collect of collectibleList) {
     let dataInDb = await orm.em.findOne(SteamOwnedCollectible, {
       profile,
-      appId: collect.appid,
+      app_id: collect.appid,
     });
-    const leave = tree.values.find((t) => t.appId == collect.appid);
+    const leave = tree.values.find((t) => t.app_id == collect.appid);
     let index = tree.values.length;
     let add;
     if (dataInDb) {
@@ -246,48 +288,11 @@ export async function fetchCollectible(
       console.error(e);
     }
   }
+  await waiting(3000)
+
 
   return orm.em.flush();
 }
-
-
-
-// export async function fetchOwnedGames(
-//   honeycomb: Honeycomb,
-//   orm: MikroORM,
-//   profile: Profile,
-// ) {
-//   //@ts-ignore
-//   const { primary_wallet } = Wallets.parse(profile.wallets);
-//   const profileObj = await honeycomb
-//     .identity()
-//     .fetch()
-//     .profile(undefined, primary_wallet);
-
-//   const steamId = profileObj.get("steamId");
-
-//   if (!steamId) return;
-//   const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${config.steam_api_key}&steamid=${testingUser || profile.steamId}&format=json&include_appinfo=1&include_played_free_games=1`
-//   const ownedGameList = await axios.get(url).then(res => (res.data.response?.games || []) as ISteamOwnedGamesApi[])
-//   waiting()
-//   console.log(ownedGameList)
-//   for (let ownGame of ownedGameList) {
-//     let dataInDb = await orm.em.findOne(SteamGame, {
-//       appId: ownGame.appid,
-//     });
-
-//     if (!dataInDb) {
-//       dataInDb = new SteamGame(
-//         ownGame.appid,
-//         ownGame.img_icon_url,
-//         ownGame.name,
-//       );
-//       orm.em.persist(dataInDb);
-//     }
-//   }
-
-//   return orm.em.flush();
-// }
 
 export async function fetchOwnedGamesDetails(
   honeycomb: Honeycomb,
@@ -300,6 +305,7 @@ export async function fetchOwnedGamesDetails(
     .identity()
     .fetch()
     .profile(undefined, primary_wallet);
+  console.log(profileObj.data.keys())
   const tree = profileObj.entity<ISteamOwnedGames>("SteamOwnedGames");
   tree.setLeaves(
     await orm.em
@@ -328,29 +334,25 @@ export async function fetchOwnedGamesDetails(
   waiting()
   console.log(ownedGameList)
   for (let ownGame of ownedGameList) {
+    await orm.em.upsert(SteamGame, {
+      app_id:
+        ownGame.appid,
+      gameImage: ownGame.img_icon_url,
+      gameName: ownGame.name,
+    });
     let dataInDb = await orm.em.findOne(SteamOwnedGames, {
       profile,
-      appId: ownGame.appid,
+      app_id: ownGame.appid,
     });
-    let dataInDbDetail = await orm.em.findOne(SteamGame, {
-      appId: ownGame.appid,
-    });
-
-    const leave = tree.values.find((t) => t.appId == ownGame.appid);
+    const leave = tree.values.find((t) => t.app_id == ownGame.appid);
     let index = tree.values.length;
     let add;
-
-    if (!dataInDbDetail) {
-      dataInDbDetail = new SteamGame(
-        ownGame.appid,
-        ownGame.img_icon_url,
-        ownGame.name,
-      );
-    }
 
     if (dataInDb) {
       if (leave) continue;
     } else {
+      console.log('seeing')
+      add = true;
       dataInDb = new SteamOwnedGames(
         [profile.address, index],
         ownGame.appid,
@@ -368,12 +370,13 @@ export async function fetchOwnedGamesDetails(
         await tree.add(dataInDb.toJSON() as any);
       }
       if (add) {
-        orm.em.persist(dataInDbDetail);
-        orm.em.persist(dataInDb)
+        orm.em.persist(dataInDb);
+
       };
     } catch (e) {
       console.error(e);
     }
+    await waiting(1000)
   }
 
   return orm.em.flush();
@@ -431,49 +434,60 @@ export async function ensureSteamUsersInDb(
 export async function ensureSteamGameCollectiblesAssetsInDb(
   orm: MikroORM,
 ) {
-  const idsSet = new Set<string>();
-  const idsAppSet = new Set<number>();
+  const appClassIdsMap = new Map<number, Set<string>>();
+  const addClassToApp = (app_id: number, classId: string) => {
+    if (!appClassIdsMap.has(app_id)) {
+      appClassIdsMap.set(app_id, new Set<string>());
+    }
+    appClassIdsMap.get(app_id)!.add(classId);
+  }
+  const removeClassFromAllApp = (classId: string) => {
+    appClassIdsMap.forEach((v, k) => {
+      v.delete(classId);
+    })
+  }
+  const getAllClassIds = () => {
+    return Array.from(appClassIdsMap.values()).reduce((a, b) => {
+      b.forEach(v => a.add(v));
+      return a;
+    }, new Set<string>());
+  }
+  // let idsSet = new Set<{ classId: string, app_id: number }>();
+  // const idsAppSet = new Set<number>();
   (await orm.em.find(SteamOwnedCollectible, {
   }, {
-    fields: ["classId"]
+    fields: ["classId", "app_id"]
   })).forEach(v => {
-    if (v.classId)
-      idsSet.add(v.classId);
 
+    if (v.classId && v.app_id)
+      addClassToApp(v.app_id, v.classId)
   });
-  // (await orm.em.find(Profile, {
-  // }, {
-  //   fields: ["steamId"]
-  // })).forEach(v => {
-  //   if (v.steamId)
-  //     idsSet.add(v.steamId);
-  // });
   (await orm.em.find(SteamAssetClassInfo, {
     classId: {
-      $in: Array.from(idsSet)
+      $in:
+        Array.from(getAllClassIds().values()),
     },
-
   }, {
     fields: ["classId"]
   })).forEach(v => {
-    idsSet.delete(v.classId);
+    removeClassFromAllApp(v.classId);
   });
-  let ids = Array.from(idsSet);
-  if (!ids.length) return;
-  for (let index = 0; index < ids.length / 100; index++) {
-    const url = `https://api.steampowered.com/ISteamEconomy/GetAssetClassInfo/v1/?key=${config.steam_api_key}0&appid=730&class_count=2&classid0=4717330486&classid1=4901046679&language=en`
+
+  if (!appClassIdsMap.size) return;
+  for (let [app_id, classIds] of appClassIdsMap) {
+    const url = `https://api.steampowered.com/ISteamEconomy/GetAssetClassInfo/v1/?key=${config.steam_api_key}&appid=${app_id}&class_count=${classIds.size}&${Array.from(classIds.values()).map((v, i) => `classid${i}=${v}`).join('&')}&language=en`
     console.log(url)
-    const userSteamSummaries = await axios.get(url).then(res => ((res.data.response?.players) as {
-      steamid: string;
-      avatar: string;
-      personaname: string;
-      realname: string;
-      level: number;
-      loccountrycode: string;
-    }[]));
-    console.log(userSteamSummaries)
-    for (let summary of userSteamSummaries) {
-      const steamUser = new SteamUser(summary.steamid || "", summary.avatar || "", summary.realname || summary.personaname || "", summary.loccountrycode || "", summary.level,)
+    const gameCollectibleAssets = await axios.get(url).then(res => ((res.data.result) as IAssetClassInfoApi)).catch(e => ({ success: false }));
+    console.log(gameCollectibleAssets)
+    for (let [resKey, asset] of Object.entries(gameCollectibleAssets)) {
+      if (!asset.classid || (["success", "error", "message"]).includes(resKey)) continue;
+      const steamUser = new SteamAssetClassInfo(
+        asset.classid,
+        app_id,
+        asset.icon_url,
+        asset.name,
+        asset.type
+      )
       orm.em.persist(steamUser);
     }
     waiting(500);
@@ -500,7 +514,7 @@ export async function fetchAllEntitiesForGame(
   // All Entities for this game will be fetched here
   await fetchCollectible(honeycomb, orm, profile, game);
 }
-
+const fetchCollectiblesForOnly = [730];
 export async function fetchAllEntitiesForAllGame(
   honeycomb: Honeycomb,
   orm: MikroORM,
@@ -509,6 +523,9 @@ export async function fetchAllEntitiesForAllGame(
   const games = await orm.em.find(SteamOwnedGames, {
     profile: {
       address: profile.address,
+    },
+    app_id: {
+      $in: fetchCollectiblesForOnly,
     }
   });
   for (let game of games) {
@@ -535,6 +552,7 @@ export async function refreshData(
   await fetchProfiles(honeycomb, orm);
   await fetchAllEntitiesForAllUser(honeycomb, orm);
   await ensureSteamUsersInDb(orm);
+  await ensureSteamGameCollectiblesAssetsInDb(orm);
 }
 
 export function startSocket(honeycomb: Honeycomb, orm: MikroORM) {

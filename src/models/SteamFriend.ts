@@ -1,20 +1,16 @@
 import {
   Entity,
-  PrimaryKey,
   Property,
 } from "@mikro-orm/core";
 import { PublicKey } from "@solana/web3.js";
-import { BaseEntity, IBaseEntity } from "../types/BaseEntity";
-
-export interface ISteamFriend extends IBaseEntity {
-  index: number;
+import { ProvableEntity, IProvableEntity } from "../types/ProvableEntity";
+export interface ISteamFriend extends IProvableEntity {
   steamId: string;
   relationship: string;
   friendSince: number;
 }
-
 @Entity()
-export class SteamFriend extends BaseEntity<SteamFriend> {
+export class SteamFriend extends ProvableEntity<SteamFriend> {
 
   @Property()
   steamId!: string;

@@ -9,15 +9,15 @@ import {
 } from "@mikro-orm/core";
 
 export interface ISteamGame { 
-    appId: number;
+    app_id: number;
     gameImage: string;
     gameName: string;
 }
 
 @Entity()
-export class SteamGame extends BaseEntity<SteamGame, "appId"> {
+export class SteamGame extends BaseEntity<SteamGame, "app_id"> {
     @PrimaryKey()
-    appId!: number;
+    app_id!: number;
 
 
 //   @OneToMany(() => Stats, (stats) => stats.profile)
@@ -32,9 +32,9 @@ export class SteamGame extends BaseEntity<SteamGame, "appId"> {
     @Property()
     gameName!: string;
 
-    constructor(_appId: number, gameImage: string, gameName: string) {
+    constructor(_app_id: number, gameImage: string, gameName: string) {
         super();
-        this.appId = _appId;
+        this.app_id = _app_id;
         this.gameImage = gameImage;
         this.gameName = gameName;
     }

@@ -1,16 +1,12 @@
-import * as web3 from "@solana/web3.js"
 import {
     Entity,
     PrimaryKey,
     BaseEntity,
     Property,
-    OneToOne,
-    Cascade,
 } from "@mikro-orm/core";
-import { IBaseEntity } from "../types/BaseEntity";
-import { Profile } from "./_Profile";
+import { IProvableEntity } from "../types/ProvableEntity";
 
-export interface ISteamUser extends IBaseEntity {
+export interface ISteamUser extends IProvableEntity {
     steamId: string;
     image: string;
     name: string;

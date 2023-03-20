@@ -1,0 +1,1 @@
+declare module 'steam-inventory-api-ng';

@@ -35,7 +35,7 @@ router.get("/callback", async (req: Request, res: Response) => {
         return response.error("Profile not found!");
     }
     console.log(profile)
-    if (profile.steamId || profile.steamUsername) {
+    if (profile.steamId && profile.steamUsername) {
         return response.conflict(
             "Steam credentials already set for this profile"
         );
@@ -50,18 +50,19 @@ router.get("/callback", async (req: Request, res: Response) => {
             .fetch()
             .profile(req.honeycomb.project().address, primary_wallet);
 
-        await profileChain.add("steamUsername", user.username || user.name).then((_) => {
-            profile.steamUsername = user.username || user.name;
-        }).catch();
-
         await profileChain.add("steamId", user.steamid).then((_) => {
             profile.steamId = user.steamid;
-        }).catch();
+        }).catch(console.error);
+
+        await profileChain.add("steamUsername", user.username || user.name).then((_) => {
+            profile.steamUsername = user.username || user.name;
+        }).catch(console.error);
 
         req.session.steamUser = user;
         await req.orm.em.flush();
-
         await fetchAllEntitiesFor(req.honeycomb, req.orm, profile)
+
+
         response.ok("Steam Auth Success!");
     } catch (err) {
         console.error(err);

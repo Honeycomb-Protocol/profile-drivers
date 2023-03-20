@@ -1,3 +1,4 @@
+import { SteamFriend } from './SteamFriend';
 import {
   Collection,
   Entity,
@@ -86,6 +87,9 @@ export class Profile
     nullable: true,
   })
   steamUsername!: string;
+
+  @OneToMany(() => SteamFriend, (steamFriend) => steamFriend.profile)
+  friends = new Collection<SteamFriend>(this);
 
   constructor(address: PublicKey) {
     super();

@@ -7,15 +7,16 @@ import {
 } from "@mikro-orm/core";
 import { PublicKey } from "@solana/web3.js";
 import { Profile } from "../models/_Profile";
-export interface IBaseEntity {
+export interface IProvableEntity {
   _id: number;
   index: number;
   profile?: Profile;
   createdAt: Date;
   updatedAt: Date;
 }
-export abstract class BaseEntity<
-  T extends IBaseEntity
+console.log(Profile)
+export abstract class ProvableEntity<
+  T extends IProvableEntity
 > extends MikroBaseEntity<T, "_id"> {
   @PrimaryKey({ autoincrement: true })
   _id!: number;

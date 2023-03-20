@@ -4,9 +4,9 @@ import {
   Property,
 } from "@mikro-orm/core";
 import { PublicKey } from "@solana/web3.js";
-import { BaseEntity, IBaseEntity } from "../types/BaseEntity";
+import { ProvableEntity, IProvableEntity } from "../types/ProvableEntity";
 
-export interface ISteamDomainUser extends IBaseEntity {
+export interface ISteamDomainUser extends IProvableEntity {
   steamId: string;
   userName: string;
   userImage: string;
@@ -21,7 +21,7 @@ export interface ISteamDomainUser extends IBaseEntity {
 }
 
 @Entity()
-export class SteamDomainUser extends BaseEntity<SteamDomainUser> {
+export class SteamDomainUser extends ProvableEntity<SteamDomainUser> {
   @PrimaryKey()
   steamId!: string;
 
