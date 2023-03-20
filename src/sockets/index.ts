@@ -8,6 +8,8 @@ import {
   userDiscriminator,
   profileDiscriminator,
 } from "@honeycomb-protocol/hive-control";
+const puppeteer = require('puppeteer');
+
 import config from '../config'
 import { MikroORM } from "@mikro-orm/core";
 import { ISteamFriend, ISteamGame, ISteamGameCollectible, Profile, SteamFriend, SteamGame, SteamOwnedCollectible, SteamOwnedGames, Wallets } from "../models";
@@ -178,7 +180,7 @@ export async function fetchFriendList(
       "friend_since": number
     }[]
   })
-  console.log(friendList)
+  // console.log(friendList)
   for (let friend of friendList) {
     let dataInDb = await orm.em.findOne(SteamFriend, {
       profile,
@@ -245,49 +247,71 @@ export async function fetchCollectible(
   const steamId = profileObj.get("steamId");
 
   if (!steamId) return;
+
+  console.log("launching puppeteer")
+
+  const browser = await puppeteer.launch();
+  const page = await browser.newPage();
   const url = `https://steamcommunity.com/inventory/${testingUser || profile.steamId}/${game.app_id || 730}/2?l=english&key=${config.steam_api_key || ""}`
-  const collectibleList = await honeycomb.http().get(url).then(res => (res.data.assets || []) as {
-    "appid": number,
-    "contextid": string,
-    "assetid": string,
-    "classid": string,
-    "instanceid": string,
-    "amount": string
-  }[]).catch(e => {
-    if (game.app_id == 730) console.log("err", e.response.statusText)
-    return [];
-  })
-  console.log(collectibleList, game.app_id)
-  for (let collect of collectibleList) {
-    let dataInDb = await orm.em.findOne(SteamOwnedCollectible, {
-      profile,
-      app_id: collect.appid,
-    });
-    const leave = tree.values.find((t) => t.app_id == collect.appid);
-    let index = tree.values.length;
-    let add;
-    if (dataInDb) {
-      if (leave) continue;
-    } else {
-      add = true;
-      dataInDb = new SteamOwnedCollectible(
-        [profile.address, index],
-        collect.appid,
-        collect.assetid,
-        collect.classid,
-        collect.amount,
-      );
-    }
-    try {
-      if (leave) {
-      } else {
-        await tree.add(dataInDb.toJSON() as any);
-      }
-      if (add) orm.em.persist(dataInDb);
-    } catch (e) {
-      console.error(e);
-    }
-  }
+  // Navigate to the Steam Community page you want to scrape
+  await page.goto(url, { waitUntil: 'networkidle2' });
+
+
+  await page.content();
+
+  let innerText = await page.evaluate(() => {
+    console.log("iner", document.querySelector("body"))
+    return JSON.parse(document.querySelector("body")!.innerText);
+  });
+
+  console.log({ innerText });
+
+
+  await browser.close();
+
+  // const collectibleList = await honeycomb.http().get(url).then(res => (res.data.assets || []) as {
+  //   "appid": number,
+  //   "contextid": string,
+  //   "assetid": string,
+  //   "classid": string,
+  //   "instanceid": string,
+  //   "amount": string
+  // }[]).catch(e => {
+  //   console.log({ e })
+  //   if (game.app_id == 730) console.log("err", e.response.statusText)
+  //   return [];
+  // })
+  // console.log({ collectibleList }, url, game.app_id)
+  // for (let collect of collectibleList) {
+  //   let dataInDb = await orm.em.findOne(SteamOwnedCollectible, {
+  //     profile,
+  //     app_id: collect.appid,
+  //   });
+  //   const leave = tree.values.find((t) => t.app_id == collect.appid);
+  //   let index = tree.values.length;
+  //   let add;
+  //   if (dataInDb) {
+  //     if (leave) continue;
+  //   } else {
+  //     add = true;
+  //     dataInDb = new SteamOwnedCollectible(
+  //       [profile.address, index],
+  //       collect.appid,
+  //       collect.assetid,
+  //       collect.classid,
+  //       collect.amount,
+  //     );
+  //   }
+  //   try {
+  //     if (leave) {
+  //     } else {
+  //       await tree.add(dataInDb.toJSON() as any);
+  //     }
+  //     if (add) orm.em.persist(dataInDb);
+  //   } catch (e) {
+  //     console.error(e);
+  //   }
+  // }
   await waiting(3000)
 
 
@@ -397,6 +421,7 @@ export async function ensureSteamUsersInDb(
   }, {
     fields: ["steamId"]
   })).forEach(v => {
+
     if (v.steamId)
       idsSet.add(v.steamId);
   });
@@ -407,9 +432,11 @@ export async function ensureSteamUsersInDb(
   }, {
     fields: ["steamId"]
   })).forEach(v => {
+
     idsSet.delete(v.steamId);
   });
   let ids = Array.from(idsSet);
+
   if (!ids.length) return;
   for (let index = 0; index < ids.length / 100; index++) {
     const url = `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${config.steam_api_key}&steamids=${ids.slice(index * 100, (index + 1) * 100).join(',')}`
@@ -472,7 +499,7 @@ export async function ensureSteamGameCollectiblesAssetsInDb(
   })).forEach(v => {
     removeClassFromAllApp(v.classId);
   });
-
+  console.log({ appClassIdsMap })
   if (!appClassIdsMap.size) return;
   for (let [app_id, classIds] of appClassIdsMap) {
     const url = `https://api.steampowered.com/ISteamEconomy/GetAssetClassInfo/v1/?key=${config.steam_api_key}&appid=${app_id}&class_count=${classIds.size}&${Array.from(classIds.values()).map((v, i) => `classid${i}=${v}`).join('&')}&language=en`
