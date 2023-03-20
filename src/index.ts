@@ -18,7 +18,13 @@ dotenv.config();
 const app = express();
 const port = config.port;
 
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    methods: ["POST", "PUT", "GET", "DELETE"],
+    credentials: true,
+  })
+);
 
 app.use(morgan("dev"));
 
