@@ -54,22 +54,22 @@ app.use(
     req.steam = steam;
     next();
   });
-
   honeycomb.project().profileDataConfig.forEach((config, label) => {
-    // if (config.__kind === "Entity") {
-    //   const capitalizeLabel = label[0].toUpperCase() + label.slice(1);
-    //   //@ts-ignore
-    //   if (!models[capitalizeLabel])
-    //     throw new Error(
-    //       `${capitalizeLabel} entity does not have a defined model`
-    //     );
 
-    //   //@ts-ignore
-    //   app.use("/entity/" + label, buildEntityRoute(models[label]));
-    // }
+    if (config.__kind === "Entity") {
+      const capitalizeLabel = label[0].toUpperCase() + label.slice(1);
+      //@ts-ignore
+      if (!models[capitalizeLabel])
+        throw new Error(
+          `${capitalizeLabel} entity does not have a defined model`
+        );
+
+      //@ts-ignore
+      app.use("/entity/" + label, buildEntityRoute(models[label]));
+    }
   });
 
-  refreshData(honeycomb, orm).then((_) => startSocket(honeycomb, orm));
+  refreshData(honeycomb, orm).then(() => startSocket(honeycomb, orm));
 
   app.use(routes);
   crons();

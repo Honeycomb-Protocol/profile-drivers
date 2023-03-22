@@ -8,7 +8,7 @@ import { ProvableEntity, IProvableEntity } from "../types/ProvableEntity";
 import { PublicKey } from '@solana/web3.js'
 export interface ISteamGameCollectible extends IProvableEntity {
     app_id: number;
-    classId: string;
+    class_id: string;
     assetId: string;
     amount: string;
 }
@@ -30,11 +30,11 @@ export class SteamOwnedCollectible extends ProvableEntity<SteamOwnedCollectible>
     assetId!: string;
 
     @Property()
-    classId!: string;
+    class_id!: string;
 
     @ManyToOne("SteamAssetClassInfo", {
-        joinColumn: "classId",
-        referenceColumnName: "classId",
+        joinColumn: "class_id",
+        referenceColumnName: "class_id",
         mapToPk: true,
         nullable: true,
     })
@@ -48,13 +48,13 @@ export class SteamOwnedCollectible extends ProvableEntity<SteamOwnedCollectible>
         [profile_address, index]: [PublicKey, number],
         app_id: number,
         assetId: string,
-        classId: string,
+        class_id: string,
         amount: string,
     ) {
         super(profile_address, index);
         this.app_id = app_id;
         this.assetId = assetId;
-        this.classId = classId;
+        this.class_id = class_id;
         this.amount = amount;
     }
 }
