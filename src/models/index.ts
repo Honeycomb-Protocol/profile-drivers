@@ -5,3 +5,4 @@ export * from "./SteamOwnedGames";
 export * from "./SteamFriend";
 export * from "./SteamDomainUser";
 export * from "./SteamGamePlayerStat";
+export * from "./SteamAcheivements";

@@ -17,6 +17,7 @@ import axios from "axios";
 import { ISteamUser, SteamUser } from "../models/SteamUser";
 import { SteamAssetClassInfo } from '../models/SteamAssetClassInfo';
 import { ISteamGamePlayerStat, SteamGamePlayerStat } from '../models/SteamGamePlayerStat';
+import { ISteamAcheivements, SteamAcheivements } from '../models/SteamAcheivements';
 const testingUser = null;
 
 interface ISteamOwnedGamesApi {
@@ -71,6 +72,7 @@ interface ISteamGamePlayerStatApi {
   "steamID": string,
   "gameName": string,
   "stats": { name: string, value: number }[],
+  "achievements": { name: string, achieved: number }[],
 }
 
 export async function saveProfile(
@@ -157,7 +159,7 @@ export async function fetchFriendList(
     .identity()
     .fetch()
     .profile(undefined, primary_wallet);
-  const tree = profileObj.entity<ISteamFriend>("steamFriend");
+  const tree = profileObj.entity<ISteamFriend>("SteamFriend");
   tree.setLeaves(
     await orm.em
       .find(
@@ -232,7 +234,7 @@ export async function fetchCollectible(
     .identity()
     .fetch()
     .profile(undefined, primary_wallet);
-  const tree = profileObj.entity<ISteamGameCollectible>("steamOwnedCollectible");
+  const tree = profileObj.entity<ISteamGameCollectible>("SteamOwnedCollectible");
   tree.setLeaves(
     await orm.em
       .find(
@@ -344,7 +346,7 @@ export async function fetchGamePlayerStats(
     .identity()
     .fetch()
     .profile(undefined, primary_wallet);
-  const stats = profileObj.entity<ISteamGamePlayerStat>("steamGamePlayerStat");
+  const stats = profileObj.entity<ISteamGamePlayerStat>("SteamGamePlayerStat");
   stats.setLeaves(
     await orm.em
       .find(
@@ -422,6 +424,96 @@ export async function fetchGamePlayerStats(
 
   return orm.em.flush();
 }
+export async function fetchGameAchievements(
+  honeycomb: Honeycomb,
+  orm: MikroORM,
+  profile: Profile,
+  game: SteamOwnedGames,
+) {
+  //@ts-ignore
+  const { primary_wallet } = Wallets.parse(profile.wallets);
+  const profileObj = await honeycomb
+    .identity()
+    .fetch()
+    .profile(undefined, primary_wallet);
+  const achievements = profileObj.entity<ISteamAcheivements>("SteamGamePlayerStat");
+  achievements.setLeaves(
+    await orm.em
+      .find(
+        SteamAcheivements,
+        {
+          profile: {
+            address: profile.address,
+          },
+          app_id: game.app_id,
+        },
+        {
+          orderBy: {
+            index: 1,
+          },
+        }
+      )
+      .then((achievements) => achievements.map((t) => t.toJSON()))
+  );
+
+  const steamId = profileObj.get("steamId");
+  if (!steamId) return;
+
+
+  const url = `https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/?appid=${game.app_id}&key=${config.steam_api_key}&steamid=${profile.steamId}`
+  const gamePlayerStat = await honeycomb.http().get(url).then(res => (res?.playerstats) as ISteamGamePlayerStatApi).catch(e => {
+    console.error({ e })
+    return;
+  })
+  if (!gamePlayerStat) return;
+
+  for (let achievementRow of gamePlayerStat.achievements) {
+    const dbStat = await orm.em.findOne(SteamAcheivements, {
+      profile: { address: profile.address },
+      name: achievementRow.name,
+      app_id: game.app_id
+    });
+    const storedAchievement = achievements.values.find((t) => t.name == achievementRow.name && t.app_id == game.app_id);
+    let index = achievements.values.length;
+
+    try {
+      if (storedAchievement) {
+        index = storedAchievement.index;
+        if (storedAchievement.achieved != achievementRow.achieved) {
+          await achievements.set(index, {
+            index,
+            name: achievementRow.name,
+            achieved: achievementRow.achieved,
+            app_id: game.app_id
+          });
+        }
+      } else {
+        await achievements.add({
+          index,
+          name: achievementRow.name,
+          achieved: achievementRow.achieved,
+          app_id: game.app_id
+        });
+      }
+
+      if (dbStat) {
+        dbStat.achieved = achievementRow.achieved;
+      } else {
+        const newAchievement = new SteamAcheivements(
+          [profile.address, index],
+          achievementRow.name,
+          achievementRow.achieved,
+          game.app_id
+        );
+        orm.em.persist(newAchievement);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  return orm.em.flush();
+}
 
 export async function fetchOwnedGamesDetails(
   honeycomb: Honeycomb,
@@ -434,7 +526,7 @@ export async function fetchOwnedGamesDetails(
     .identity()
     .fetch()
     .profile(undefined, primary_wallet);
-  const tree = profileObj.entity<ISteamOwnedGames>("steamOwnedGames");
+  const tree = profileObj.entity<ISteamOwnedGames>("SteamOwnedGames");
   tree.setLeaves(
     await orm.em
       .find(
@@ -696,8 +788,8 @@ export async function fetchAllEntitiesForGame(
   game: SteamOwnedGames) {
   // All Entities for this game will be fetched here
   // await fetchCollectible(honeycomb, orm, profile, game);
-  console.log("fetchAllEntitiesForGame")
   await fetchGamePlayerStats(honeycomb, orm, profile, game);
+  await fetchGameAchievements(honeycomb, orm, profile, game);
 }
 const fetchCollectiblesForOnly = [730];
 export async function fetchAllEntitiesForAllGame(
