@@ -17,7 +17,7 @@ import axios from "axios";
 import { ISteamUser, SteamUser } from "../models/SteamUser";
 import { SteamAssetClassInfo } from '../models/SteamAssetClassInfo';
 import { ISteamGamePlayerStat, SteamGamePlayerStat } from '../models/SteamGamePlayerStat';
-import { ISteamAcheivements, SteamAcheivements } from '../models/SteamAcheivements';
+import { ISteamAchievements, SteamAchievements } from '../models/SteamAchievements';
 const testingUser = null;
 
 interface ISteamOwnedGamesApi {
@@ -73,6 +73,11 @@ interface ISteamGamePlayerStatApi {
   "gameName": string,
   "stats": { name: string, value: number }[],
   "achievements": { name: string, achieved: number }[],
+}
+interface ISteamPlayerAchievementsApi {
+  "steamID": string,
+  "gameName": string,
+  "achievements": { apiname: string, achieved: number, unlocktime: number }[],
 }
 
 export async function saveProfile(
@@ -436,11 +441,11 @@ export async function fetchGameAchievements(
     .identity()
     .fetch()
     .profile(undefined, primary_wallet);
-  const achievements = profileObj.entity<ISteamAcheivements>("SteamGamePlayerStat");
+  const achievements = profileObj.entity<ISteamAchievements>("SteamAchievements");
   achievements.setLeaves(
     await orm.em
       .find(
-        SteamAcheivements,
+        SteamAchievements,
         {
           profile: {
             address: profile.address,
@@ -460,20 +465,20 @@ export async function fetchGameAchievements(
   if (!steamId) return;
 
 
-  const url = `https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/?appid=${game.app_id}&key=${config.steam_api_key}&steamid=${profile.steamId}`
-  const gamePlayerStat = await honeycomb.http().get(url).then(res => (res?.playerstats) as ISteamGamePlayerStatApi).catch(e => {
+  const url = `https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${game.app_id}&key=${config.steam_api_key}&steamid=${profile.steamId}`
+  const gamePlayerStat = await honeycomb.http().get(url).then(res => (res?.playerstats) as ISteamPlayerAchievementsApi).catch(e => {
     console.error({ e })
     return;
   })
   if (!gamePlayerStat) return;
 
   for (let achievementRow of gamePlayerStat.achievements) {
-    const dbStat = await orm.em.findOne(SteamAcheivements, {
+    const dbStat = await orm.em.findOne(SteamAchievements, {
       profile: { address: profile.address },
-      name: achievementRow.name,
+      name: achievementRow.apiname,
       app_id: game.app_id
     });
-    const storedAchievement = achievements.values.find((t) => t.name == achievementRow.name && t.app_id == game.app_id);
+    const storedAchievement = achievements.values.find((t) => t.name == achievementRow.apiname && t.app_id == game.app_id);
     let index = achievements.values.length;
 
     try {
@@ -482,28 +487,31 @@ export async function fetchGameAchievements(
         if (storedAchievement.achieved != achievementRow.achieved) {
           await achievements.set(index, {
             index,
-            name: achievementRow.name,
+            name: achievementRow.apiname,
             achieved: achievementRow.achieved,
-            app_id: game.app_id
+            app_id: game.app_id,
+            unlockTime: achievementRow.unlocktime
           });
         }
       } else {
         await achievements.add({
           index,
-          name: achievementRow.name,
+          name: achievementRow.apiname,
           achieved: achievementRow.achieved,
-          app_id: game.app_id
+          app_id: game.app_id,
+          unlockTime: achievementRow.unlocktime
         });
       }
 
       if (dbStat) {
         dbStat.achieved = achievementRow.achieved;
       } else {
-        const newAchievement = new SteamAcheivements(
+        const newAchievement = new SteamAchievements(
           [profile.address, index],
-          achievementRow.name,
+          achievementRow.apiname,
           achievementRow.achieved,
-          game.app_id
+          game.app_id,
+          achievementRow.unlocktime
         );
         orm.em.persist(newAchievement);
       }
@@ -777,7 +785,7 @@ export async function fetchAllEntitiesFor(
   profile: Profile
 ) {
   // All Entities for this profile will be fetched here
-  // await fetchFriendList(honeycomb, orm, profile);
+  await fetchFriendList(honeycomb, orm, profile);
   await fetchOwnedGamesDetails(honeycomb, orm, profile);
 }
 
