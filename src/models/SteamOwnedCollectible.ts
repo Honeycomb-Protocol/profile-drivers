@@ -1,4 +1,5 @@
 import {
+    Cascade,
     Entity,
     ManyToOne,
     Property,
@@ -32,13 +33,14 @@ export class SteamOwnedCollectible extends ProvableEntity<SteamOwnedCollectible>
     @Property()
     class_id!: string;
 
-    @ManyToOne("SteamAssetClassInfo", {
-        joinColumn: "class_id",
-        referenceColumnName: "class_id",
-        mapToPk: true,
-        nullable: true,
-    })
-    asset?: Ref<"SteamAssetClassInfo">;
+    // @ManyToOne("SteamAssetClassInfo", {
+    //     joinColumn: "class_id",
+    //     referenceColumnName: "class_id",
+    //     mapToPk: true,
+    //     nullable: true,
+    //     cascade: [Cascade.PERSIST, Cascade.REMOVE],
+    // })
+    // asset?: Ref<"SteamAssetClassInfo">;
 
     @Property()
     amount!: string;

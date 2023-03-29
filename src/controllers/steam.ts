@@ -61,7 +61,6 @@ const getGames: Handler = (req: Request, res) => {
 };
 const getGamesAchievements: Handler = (req: Request, res) => {
   const response = new ResponseHelper(res);
-  console.log(req.params)
   return req.orm?.em
     .find(SteamAchievements, {
       profile: {

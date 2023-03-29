@@ -43,9 +43,10 @@ export class SteamAssetClassInfo extends BaseEntity<SteamAssetClassInfo, "class_
     @Property()
     type!: string;
 
-    @OneToMany("SteamOwnedCollectible", "asset", {
-        orphanRemoval: true,
-    })
+    // @OneToMany("SteamOwnedCollectible", "asset", {
+    //     orphanRemoval: true,
+    //     nullable: true,
+    // })
     ownedBy = new Collection<SteamOwnedCollectible>(this);
 
     constructor(class_id: string, app_id: number, iconUrl: string, name: string, type: string) {

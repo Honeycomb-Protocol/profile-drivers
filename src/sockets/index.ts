@@ -264,7 +264,14 @@ export async function fetchCollectible(
 
   console.log("launching puppeteer")
 
-  const browser = await puppeteer.launch();
+  const options = {
+    product: "chrome",
+    dumpio: true,
+    ignoreHTTPSErrors: true,
+
+  };
+
+  const browser = await puppeteer.launch(options);
   const page = await browser.newPage();
   const url = `https://steamcommunity.com/inventory/${testingUser || profile.steamId}/${game.app_id || 730}/2?l=english&key=${config.steam_api_key || ""}`
   // Navigate to the Steam Community page you want to scrape
@@ -657,66 +664,6 @@ export async function ensureSteamUsersInDb(
   }
   return orm.em.flush();
 }
-// export async function ensureSteamGamePlayerStatsInDb(
-//   orm: MikroORM,
-// ) {
-//   const idsSet = new Map<number, string>();
-//   (await orm.em.find(SteamOwnedGames, {
-//   }, {
-//     fields: ["app_id", "profile"]
-//   })).forEach(v => {
-//     if (v.app_id && v.profile)
-//       idsSet.set(v.app_id, v.profile.steamId)
-//   });
-//   // (await orm.em.find(Profile, {
-//   // }, {
-//   //   fields: ["steamId"]
-//   // })).forEach(v => {
-
-//   //   if (v.steamId)
-//   //     idsSet.add(v.steamId);
-//   // });
-
-//   const or: any[] = [];
-
-//   idsSet.forEach((v, k) => {
-//     or.push({
-//       steamGame: {
-//         app_id: k,
-
-//       },
-//       profile: {
-//         steamId: v
-//       }
-//     })
-//   });
-
-//   (await orm.em.find(SteamGamePlayerStat, {
-//     $or: or,
-//   }, {
-//     fields: ["steamGame"]
-//   })).forEach(v => {
-//     idsSet.delete(v.steamGame.app_id);
-//   });
-//   // let ids = Array.from(idsSet);
-
-//   if (!idsSet.size) return;
-//   for (let [app_id, steamId] of idsSet) {
-//     const url = `https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/?appid=${app_id}&key=${config.steam_api_key}&steamid=${steamId}`
-//     console.log(url)
-//     const profile = await orm.em.find(Profile, {
-//       steamId
-//     });
-//     const steamGamePlayerStat = await axios.get(url).then(res => ((res.data?.playerstats || {}) as ISteamGamePlayerStat));
-//     console.log(steamGamePlayerStat)
-//     for (let stat of steamGamePlayerStat.stats) {
-//       const steamStat = new SteamGamePlayerStat(profile, stat.name, stat.value)
-//       orm.em.persist(steamUser);
-//     }
-//     waiting(500);
-//   }
-//   return orm.em.flush();
-// }
 export async function ensureSteamGameCollectiblesAssetsInDb(
   orm: MikroORM,
 ) {
@@ -795,7 +742,7 @@ export async function fetchAllEntitiesForGame(
   profile: Profile,
   game: SteamOwnedGames) {
   // All Entities for this game will be fetched here
-  // await fetchCollectible(honeycomb, orm, profile, game);
+  await fetchCollectible(honeycomb, orm, profile, game);
   await fetchGamePlayerStats(honeycomb, orm, profile, game);
   await fetchGameAchievements(honeycomb, orm, profile, game);
 }
