@@ -44,7 +44,7 @@ export class SteamAssetClassInfo extends BaseEntity<SteamAssetClassInfo, "class_
     type!: string;
 
     @OneToMany("SteamOwnedCollectible", "asset", {
-        orphanRemoval: true
+        orphanRemoval: true,
     })
     ownedBy = new Collection<SteamOwnedCollectible>(this);
 
