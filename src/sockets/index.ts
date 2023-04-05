@@ -30,6 +30,7 @@ export async function saveProfile(
 
     const profile = new Profile(profileAddress);
     profile.useraddress = profileChain.user;
+    profile.identity = profileChain.identity;
     //@ts-ignore
     profile.wallets = Wallets.from({
       primary_wallet: userChain.primaryWallet,
@@ -81,12 +82,14 @@ export async function fetchTweets(
   twitter: Twitter,
   profile: Profile
 ) {
-  //@ts-ignore
-  const { primary_wallet } = Wallets.parse(profile.wallets);
   const profileObj = await honeycomb
     .identity()
     .fetch()
-    .profile(undefined, primary_wallet);
+    .profile(
+      undefined,
+      new web3.PublicKey(profile.useraddress),
+      profile.identity
+    );
   const tweets = profileObj.entity<ITweet>("tweets");
   tweets.setLeaves(
     await orm.em

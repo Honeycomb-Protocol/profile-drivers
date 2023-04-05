@@ -11,7 +11,6 @@ const router = express.Router();
 
 router.post("/", authenticate, async (req: Request, res: Response) => {
   const response = new ResponseHelper(res);
-  console.log("req.user", req.user);
   if (!req.user || !req.twitter)
     return response.notFound("web3User not found in session.");
   try {
@@ -58,21 +57,11 @@ router.post("/callback", authenticate, async (req: Request, res: Response) => {
 
     delete req.session.twRequestToken;
 
-    console.log("asdasd", {
-      oauth_verifier,
-      oauth_token,
-    });
     const accessToken = await req.twitter.getAccessToken({
       oauth_token: oauth_token,
       oauth_verifier: oauth_verifier,
     });
     const userClient = new Twitter({
-      access_token_key: accessToken.oauth_token,
-      access_token_secret: accessToken.oauth_token_secret,
-      consumer_key: config.twitter_consumer_key,
-      consumer_secret: config.twitter_consumer_secret,
-    });
-    console.log("asdasd", {
       access_token_key: accessToken.oauth_token,
       access_token_secret: accessToken.oauth_token_secret,
       consumer_key: config.twitter_consumer_key,

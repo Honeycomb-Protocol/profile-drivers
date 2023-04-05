@@ -20,8 +20,8 @@ const port = config.port;
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
-    methods: ["POST", "PUT", "GET", "DELETE"],
+    origin: ["https://profiles.honeycombprotocol.com", "http://localhost:3000"],
+    methods: ["POST", "PUT", "GET", "DELETE", "OPTIONS"],
     credentials: true,
   })
 );

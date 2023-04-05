@@ -81,6 +81,9 @@ export class Profile
   useraddress!: PublicKey;
 
   @Property()
+  identity!: string;
+
+  @Property()
   wallets!: Wallets;
 
   @Property({

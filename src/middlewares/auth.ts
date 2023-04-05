@@ -17,7 +17,7 @@ export const authenticate: Handler = async (
     } else {
       if (!req.honeycomb) return response.error("Honeycomb not initialized!");
       const publicInfo = await req.honeycomb.publicInfo();
-      let authDriver = publicInfo.get("auth_driver");
+      let authDriver = publicInfo.get("auth_driver_offchain");
       if (!authDriver) return response.notFound("Auth driver not found!");
       if (authDriver.charAt(-1) === "/") authDriver = authDriver.slice(0, -1);
 

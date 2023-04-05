@@ -47,7 +47,9 @@ export async function getHoneycomb(
     };
   }
 
-  const honeycomb = new Honeycomb(new web3.Connection(RPC, opts));
+  const honeycomb = new Honeycomb(new web3.Connection(RPC, opts), {
+    env: process.env.HONEYCOMB_ENV || "main",
+  });
   honeycomb.use(
     identityModule(web3.Keypair.fromSecretKey(Uint8Array.from(project.driver)))
   );
