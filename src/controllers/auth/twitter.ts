@@ -6,6 +6,11 @@ import config from "../../config";
 import { ResponseHelper } from "../../utils";
 import { Profile, Wallets } from "../../models";
 import { authenticate } from "../../middlewares";
+import {
+  IdentityProfile,
+  getProfilePda,
+} from "@honeycomb-protocol/hive-control";
+import { saveProfile } from "../../sockets";
 
 const router = express.Router();
 
@@ -36,12 +41,28 @@ router.post("/callback", authenticate, async (req: Request, res: Response) => {
   if (!req.user || !req.orm || !req.honeycomb || !req.twitter)
     return response.notFound("web3User not found in session.");
 
-  const profile = await req.orm.em.findOne(Profile, {
+  let profile = await req.orm.em.findOne(Profile, {
     useraddress: req.user.address,
   });
 
+  let profileChain: IdentityProfile;
   if (!profile) {
-    return response.notFound("Profile not found!");
+    profileChain = await req.honeycomb
+      .identity()
+      .fetch()
+      .profile(
+        req.honeycomb.project().address,
+        new web3.PublicKey(req.user.address)
+      );
+
+    if (!profileChain) return response.notFound("Profile not found!");
+
+    profile = await saveProfile(
+      req.honeycomb,
+      req.orm,
+      getProfilePda(req.honeycomb.project().address, req.user.address)[0],
+      profileChain.profile()
+    );
   }
 
   if (profile.twitterId || profile.twitterUsername) {
@@ -69,7 +90,7 @@ router.post("/callback", authenticate, async (req: Request, res: Response) => {
     });
     const user = await userClient.get("account/verify_credentials");
 
-    const profileChain = await req.honeycomb
+    profileChain = await req.honeycomb
       .identity()
       .fetch()
       .profile(
@@ -81,14 +102,14 @@ router.post("/callback", authenticate, async (req: Request, res: Response) => {
     await profileChain
       .add("twitterUsername", user.screen_name)
       .then((_) => {
-        profile.twitterUsername = user.screen_name;
+        profile && (profile.twitterUsername = user.screen_name);
       })
       .catch();
 
     await profileChain
       .add("twitterId", user.id_str)
       .then((_) => {
-        profile.twitterId = user.id_str;
+        profile && (profile.twitterId = user.id_str);
       })
       .catch();
 

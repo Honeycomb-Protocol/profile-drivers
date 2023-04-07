@@ -18,17 +18,17 @@ export async function saveProfile(
   profileAddress: web3.PublicKey,
   profileChain: ProfileChain
 ) {
-  const count = await orm.em.count(Profile, {
+  let profile = await orm.em.findOne(Profile, {
     address: profileAddress,
   });
 
-  if (!count) {
-    const userChain = await UserChain.fromAccountAddress(
-      honeycomb.processedConnection,
-      profileChain.user
-    );
+  const userChain = await UserChain.fromAccountAddress(
+    honeycomb.processedConnection,
+    profileChain.user
+  );
 
-    const profile = new Profile(profileAddress);
+  if (!profile) {
+    profile = new Profile(profileAddress);
     profile.useraddress = profileChain.user;
     profile.identity = profileChain.identity;
     //@ts-ignore
@@ -49,7 +49,29 @@ export async function saveProfile(
 
     orm.em.persist(profile);
     await orm.em.flush();
+  } else {
+    profile.useraddress = profileChain.user;
+    profile.identity = profileChain.identity;
+    //@ts-ignore
+    profile.wallets = Wallets.from({
+      primary_wallet: userChain.primaryWallet,
+      secondary_wallets: userChain.secondaryWallets,
+    }).toString();
+
+    const twitterId = profileChain.data.get("twitterId");
+    if (twitterId && twitterId.__kind == "SingleValue") {
+      profile.twitterId = twitterId.value;
+    }
+
+    const twitterUsername = profileChain.data.get("twitterUsername");
+    if (twitterUsername && twitterUsername.__kind == "SingleValue") {
+      profile.twitterUsername = twitterUsername.value;
+    }
+
+    await orm.em.flush();
   }
+
+  return profile;
 }
 
 export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
