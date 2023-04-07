@@ -4,7 +4,6 @@ import Twitter, { OauthToken, OauthTokenSecret } from "twitter-lite";
 import config from "../../config";
 import { ResponseHelper } from "../../utils";
 import { Profile, Wallets } from "../../models";
-import { fetchAllEntitiesFor } from "../../sockets";
 import { authenticate } from "../../middlewares";
 
 const router = express.Router();
@@ -15,7 +14,7 @@ router.post("/", authenticate, async (req: Request, res: Response) => {
     return response.notFound("web3User not found in session.");
   try {
     const twRequestToken = (await req.twitter.getRequestToken(
-      "http://localhost:5173/twitter/callback"
+      config.frontend_url + "/twitter/callback"
     )) as {
       oauth_token: OauthToken;
       oauth_token_secret: OauthTokenSecret;
