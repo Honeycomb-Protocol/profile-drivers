@@ -91,6 +91,7 @@ export async function fetchTweets(
       profile.identity
     );
   const tweets = profileObj.entity<ITweet>("tweets");
+  if (!tweets) return;
   tweets.setLeaves(
     await orm.em
       .find(
