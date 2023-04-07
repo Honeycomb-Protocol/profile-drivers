@@ -1,3 +1,4 @@
+import * as web3 from "@solana/web3.js";
 import express, { Response } from "express";
 import { Request } from "../../types";
 import Twitter, { OauthToken, OauthTokenSecret } from "twitter-lite";
@@ -68,12 +69,14 @@ router.post("/callback", authenticate, async (req: Request, res: Response) => {
     });
     const user = await userClient.get("account/verify_credentials");
 
-    //@ts-ignore
-    const { primary_wallet } = Wallets.parse(profile.wallets);
     const profileChain = await req.honeycomb
       .identity()
       .fetch()
-      .profile(req.honeycomb.project().address, primary_wallet);
+      .profile(
+        req.honeycomb.project().address,
+        new web3.PublicKey(profile.useraddress),
+        profile.identity
+      );
 
     await profileChain
       .add("twitterUsername", user.screen_name)
