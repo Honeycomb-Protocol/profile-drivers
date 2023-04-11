@@ -1,69 +1,16 @@
-import {
-  Collection,
-  Entity,
-  OneToMany,
-  PrimaryKey,
-  Property,
-  BaseEntity,
-} from "@mikro-orm/core";
+import { Entity, PrimaryKey, Property, BaseEntity } from "@mikro-orm/core";
 import { PublicKey } from "@solana/web3.js";
-import { Stats } from "./Stats";
-import { Tweets } from "./Tweets";
-
-export interface IWallets {
-  primary_wallet: PublicKey;
-  secondary_wallets: PublicKey[];
-}
 
 export interface IProfile {
   address: PublicKey;
-  useraddress: PublicKey;
-  wallets: IWallets;
-  twitterUsername?: string;
-  twitterId?: string;
-}
-
-export class Wallets implements IWallets {
-  public primary_wallet: PublicKey;
-  public secondary_wallets: PublicKey[];
-
-  constructor(input: string = "{}") {
-    const parsed = Wallets.parse(input);
-    this.primary_wallet = parsed.primary_wallet || PublicKey.default;
-    this.secondary_wallets = parsed.secondary_wallets || [];
-  }
-
-  public toString(): string {
-    return Wallets.stringify(this);
-  }
-
-  public static from(wallets: IWallets) {
-    return new Wallets(Wallets.stringify(wallets));
-  }
-
-  public static parse(input: string) {
-    const parsed = {} as IWallets;
-    parsed.secondary_wallets = [];
-
-    input.split(";").forEach((wallet) => {
-      if (wallet.startsWith("p:")) {
-        parsed.primary_wallet = new PublicKey(wallet.replace("p:", ""));
-      } else {
-        parsed.secondary_wallets.push(new PublicKey(wallet.replace("s:", "")));
-      }
-    });
-    if (!parsed.primary_wallet)
-      throw new Error("Primary wallet not found in input");
-    return parsed;
-  }
-
-  public static stringify(wallets: IWallets) {
-    const stringified = [`p:${wallets.primary_wallet.toString()}`];
-    wallets.secondary_wallets.forEach((wallet) =>
-      stringified.push(`s:${wallet.toString()}`)
-    );
-    return stringified.join(";");
-  }
+  userAddress: PublicKey;
+  identity: string;
+  xp: number;
+  level: number;
+  bounty: number;
+  resource1: number;
+  resource2: number;
+  resource3: number;
 }
 
 @Entity()
@@ -74,33 +21,40 @@ export class Profile
   @PrimaryKey()
   address!: PublicKey;
 
-  @OneToMany(() => Stats, (stats) => stats.profile)
-  stats = new Collection<Stats>(this);
-
   @Property()
-  useraddress!: PublicKey;
+  userAddress!: PublicKey;
 
   @Property()
   identity!: string;
 
   @Property()
-  wallets!: Wallets;
+  xp!: number;
 
-  @Property({
-    nullable: true,
-  })
-  twitterId!: string;
+  @Property()
+  level!: number;
 
-  @Property({
-    nullable: true,
-  })
-  twitterUsername!: string;
+  @Property()
+  bounty!: number;
 
-  @OneToMany(() => Tweets, (tweet) => tweet.profile)
-  tweets = new Collection<Tweets>(this);
+  @Property()
+  resource1!: number;
 
-  constructor(address: PublicKey) {
+  @Property()
+  resource2!: number;
+
+  @Property()
+  resource3!: number;
+
+  constructor(profile: IProfile) {
     super();
-    this.address = address;
+    this.address = profile.address;
+    this.userAddress = profile.userAddress;
+    this.identity = profile.identity;
+    this.xp = profile.xp;
+    this.level = profile.level;
+    this.bounty = profile.bounty;
+    this.resource1 = profile.xp;
+    this.resource2 = profile.resource2;
+    this.resource3 = profile.resource3;
   }
 }

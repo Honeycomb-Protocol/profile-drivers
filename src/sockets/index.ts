@@ -2,18 +2,36 @@ import * as web3 from "@solana/web3.js";
 import {
   HIVECONTROL_PROGRAM_ID,
   Honeycomb,
-  User as UserChain,
+  IdentityProfile,
   Profile as ProfileChain,
-  userDiscriminator,
   profileDiscriminator,
 } from "@honeycomb-protocol/hive-control";
 import { MikroORM } from "@mikro-orm/core";
-import { Profile, Wallets } from "../models";
-import Twitter from "twitter-lite";
-import { ITweet, Tweets } from "../models/Tweets";
+import { Profile } from "../models";
+import { getMissionsProgram } from "../config";
+
+const userLevelCalc = (xp: number) => {
+  let level = {
+    level: 0,
+    next: 0,
+  };
+
+  for (let i = 0; i <= 101; i++) {
+    let check = 25 * (i + i * i);
+    if (xp < check) {
+      level = { level: i - 1, next: check };
+      break;
+    }
+
+    if (check >= 252500) {
+      level = { level: i, next: check };
+      break;
+    }
+  }
+  return level;
+};
 
 export async function saveProfile(
-  honeycomb: Honeycomb,
   orm: MikroORM,
   profileAddress: web3.PublicKey,
   profileChain: ProfileChain
@@ -22,55 +40,41 @@ export async function saveProfile(
     address: profileAddress,
   });
 
-  const userChain = await UserChain.fromAccountAddress(
-    honeycomb.processedConnection,
-    profileChain.user
-  );
-
   if (!profile) {
-    profile = new Profile(profileAddress);
-    profile.useraddress = profileChain.user;
-    profile.identity = profileChain.identity;
-    //@ts-ignore
-    profile.wallets = Wallets.from({
-      primary_wallet: userChain.primaryWallet,
-      secondary_wallets: userChain.secondaryWallets,
-    }).toString();
-
-    const twitterId = profileChain.data.get("twitterId");
-    if (twitterId && twitterId.__kind == "SingleValue") {
-      profile.twitterId = twitterId.value;
-    }
-
-    const twitterUsername = profileChain.data.get("twitterUsername");
-    if (twitterUsername && twitterUsername.__kind == "SingleValue") {
-      profile.twitterUsername = twitterUsername.value;
-    }
-
+    profile = new Profile({
+      address: profileAddress,
+      userAddress: profileChain.user,
+      identity: profileChain.identity,
+      xp: 0,
+      level: 0,
+      bounty: 0,
+      resource1: 0,
+      resource2: 0,
+      resource3: 0,
+    });
     orm.em.persist(profile);
-    await orm.em.flush();
-  } else {
-    profile.useraddress = profileChain.user;
-    profile.identity = profileChain.identity;
-    //@ts-ignore
-    profile.wallets = Wallets.from({
-      primary_wallet: userChain.primaryWallet,
-      secondary_wallets: userChain.secondaryWallets,
-    }).toString();
-
-    const twitterId = profileChain.data.get("twitterId");
-    if (twitterId && twitterId.__kind == "SingleValue") {
-      profile.twitterId = twitterId.value;
-    }
-
-    const twitterUsername = profileChain.data.get("twitterUsername");
-    if (twitterUsername && twitterUsername.__kind == "SingleValue") {
-      profile.twitterUsername = twitterUsername.value;
-    }
-
-    await orm.em.flush();
   }
 
+  profile.xp = parseInt(
+    (profileChain.data.get("missions_xp") || "0") as string
+  );
+  profile.level = parseInt(
+    (profileChain.data.get("missions_level") || "0") as string
+  );
+  profile.bounty = parseInt(
+    (profileChain.data.get("missions_bounty") || "0") as string
+  );
+  profile.resource1 = parseInt(
+    (profileChain.data.get("missions_resource1") || "0") as string
+  );
+  profile.resource2 = parseInt(
+    (profileChain.data.get("missions_resource2") || "0") as string
+  );
+  profile.resource3 = parseInt(
+    (profileChain.data.get("missions_resource3") || "0") as string
+  );
+
+  await orm.em.flush();
   return profile;
 }
 
@@ -85,7 +89,6 @@ export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
         profilesChain.map(async (profileChain) => {
           try {
             await saveProfile(
-              honeycomb,
               orm,
               profileChain.pubkey,
               ProfileChain.fromAccountInfo(profileChain.account)[0]
@@ -98,116 +101,67 @@ export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
     });
 }
 
-export async function fetchTweets(
-  honeycomb: Honeycomb,
-  orm: MikroORM,
-  twitter: Twitter,
-  profile: Profile
+export async function setSolPatrolStats(
+  solpatrolUser: any,
+  profile: IdentityProfile
 ) {
-  const profileObj = await honeycomb
-    .identity()
-    .fetch()
-    .profile(
-      undefined,
-      new web3.PublicKey(profile.useraddress),
-      profile.identity
-    );
-  const tweets = profileObj.entity<ITweet>("tweets");
-  if (!tweets) return;
-  tweets.setLeaves(
-    await orm.em
-      .find(
-        Tweets,
-        {
-          profile: {
-            address: profile.address,
-          },
-        },
-        {
-          orderBy: {
-            index: 1,
-          },
-        }
+  const xp = solpatrolUser.xp.toNumber() / 100;
+  const data = {
+    xp: xp,
+    level: userLevelCalc(xp).level,
+    bounty: solpatrolUser.bounty.toNumber() / 100,
+    resource1: solpatrolUser.resource1.toNumber() / 100,
+    resource2: solpatrolUser.resource2.toNumber() / 100,
+    resource3: solpatrolUser.resource3.toNumber() / 100,
+  };
+
+  try {
+    await Promise.all(
+      Object.entries(data).map(async ([key, value]) =>
+        profile.set(key, value.toString())
       )
-      .then((tweets) => tweets.map((t) => t.toJSON()))
-  );
-
-  const twitterId = profileObj.get("twitterId");
-
-  if (!twitterId) return;
-
-  const tweetsRaw = await twitter.get(`users/${twitterId}/tweets`);
-
-  for (let tweetRaw of tweetsRaw.data) {
-    const dbTweet = await orm.em.findOne(Tweets, {
-      tweetId: tweetRaw.id,
-    });
-    const storedTweet = tweets.values.find((t) => t.tweetId == tweetRaw.id);
-    let index = tweets.values.length;
-
-    try {
-      if (storedTweet) {
-        index = storedTweet.index;
-        // await tweets.set(index, {
-        //   index,
-        //   tweetId: tweetRaw.id,
-        //   text: tweetRaw.text,
-        // });
-      } else {
-        await tweets.add({
-          index,
-          tweetId: tweetRaw.id,
-          text: tweetRaw.text,
-        });
-      }
-
-      if (dbTweet) {
-        dbTweet.text = tweetRaw.text;
-      } else {
-        const newTweet = new Tweets(
-          [profile.address, index],
-          tweetRaw.id,
-          tweetRaw.text
-        );
-        orm.em.persist(newTweet);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  return orm.em.flush();
-}
-
-export async function fetchAllEntitiesFor(
-  honeycomb: Honeycomb,
-  orm: MikroORM,
-  twitter: Twitter,
-  profile: Profile
-) {
-  // All Entities for this profile will be fetched here
-  await fetchTweets(honeycomb, orm, twitter, profile);
-}
-
-export async function fetchAllEntitiesForAllUser(
-  honeycomb: Honeycomb,
-  orm: MikroORM,
-  twitter: Twitter
-) {
-  const profiles = await orm.em.find(Profile, {});
-
-  for (let profile of profiles) {
-    fetchAllEntitiesFor(honeycomb, orm, twitter, profile);
+    );
+  } catch (e) {
+    console.error(e);
   }
 }
 
-export async function refreshData(
-  honeycomb: Honeycomb,
-  orm: MikroORM,
-  twitter: Twitter
-) {
+export function fetchSolpatrolUsers(honeycomb: Honeycomb) {
+  const { missionsProgram } = getMissionsProgram(honeycomb);
+
+  return missionsProgram.account.userAccount
+    .all()
+    .then((x) => {
+      console.log("SP", x.length);
+      return x;
+    })
+    .then((x) =>
+      Promise.all(
+        x.map(async (u) => {
+          try {
+            const { user } = await honeycomb
+              .identity()
+              .fetch()
+              .walletResolver(u.account.wallet);
+            const profile = await honeycomb
+              .identity()
+              .fetch()
+              .profile(
+                undefined,
+                user,
+                u.account.wallet.toString().slice(0, 5)
+              );
+
+            setSolPatrolStats(u, profile);
+          } catch {}
+        })
+      )
+    );
+}
+
+export async function refreshData(honeycomb: Honeycomb, orm: MikroORM) {
   await fetchProfiles(honeycomb, orm);
-  await fetchAllEntitiesForAllUser(honeycomb, orm, twitter);
+  await fetchSolpatrolUsers(honeycomb);
 }
 
 export function startSocket(honeycomb: Honeycomb, orm: MikroORM) {
@@ -227,34 +181,47 @@ export function startSocket(honeycomb: Honeycomb, orm: MikroORM) {
         )[0];
         if (profileChain.project.equals(honeycomb.project().projectAddress)) {
           console.log(`Profile ${account.accountId.toString()} data changed`);
-          await saveProfile(honeycomb, orm, account.accountId, profileChain);
+          await saveProfile(orm, account.accountId, profileChain);
         }
-      } catch {
-        try {
-          if (userDiscriminator.join("") !== discriminator.join("")) {
-            throw new Error("Profile Discriminator Mismatch");
-          }
-
-          const userChain = UserChain.fromAccountInfo(account.accountInfo)[0];
-          console.log(`User ${account.accountId.toString()} data changed`);
-
-          const profile = await orm.em.findOne(Profile, {
-            useraddress: account.accountId,
-          });
-
-          if (!!profile) {
-            //@ts-ignore
-            profile.wallets = Wallets.from({
-              primary_wallet: userChain.primaryWallet,
-              secondary_wallets: userChain.secondaryWallets,
-            }).toString();
-
-            await orm.em.flush();
-          }
-        } catch {
-          console.log(`${account.accountId} not matched any discriminator`);
-        }
-      }
+      } catch {}
     }
+  );
+}
+
+export function startMissionsSocket(honeycomb: Honeycomb, orm: MikroORM) {
+  console.log("Started missions sockets...");
+  const { missionsCoder, missionsProgram } = getMissionsProgram(honeycomb);
+  return honeycomb.processedConnection.onProgramAccountChange(
+    missionsProgram.programId,
+    async (account) => {
+      try {
+        const userAccount = missionsCoder.decode(
+          "userAccount",
+          account.accountInfo.data
+        );
+
+        const { user } = await honeycomb
+          .identity()
+          .fetch()
+          .walletResolver(userAccount.wallet);
+        const profile = await honeycomb
+          .identity()
+          .fetch()
+          .profile(undefined, user);
+
+        setSolPatrolStats(userAccount, profile);
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    "processed",
+    [
+      {
+        dataSize: missionsProgram.account.userAccount.size,
+      },
+      {
+        memcmp: missionsCoder.memcmp("userAccount"),
+      },
+    ]
   );
 }

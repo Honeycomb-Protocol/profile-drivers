@@ -1,18 +1,19 @@
 import * as web3 from "@solana/web3.js";
+import * as anchor from "@project-serum/anchor";
 import fs from "fs";
 import dotenv from "dotenv";
-import { Project } from "./types";
+import { Project, Missions, MissionsIDL } from "./types";
 import {
   Honeycomb,
   HoneycombProject,
   identityModule,
 } from "@honeycomb-protocol/hive-control";
-import Twitter from "twitter-lite";
 
 dotenv.config();
 
 const config = {
   node_env: process.env.NODE_ENV,
+  honeycomb_env: process.env.HONEYCOMB_ENV || "main",
   port: process.env.PORT || 4000,
   cors_origin: process.env.CORS_ORIGIN || "*",
   request_limit: process.env.REQUEST_LIMIT || "100kb",
@@ -20,13 +21,6 @@ const config = {
   rpc_url: process.env.RPC_URL || "https://api.mainnet-beta.solana.com",
   db_name: process.env.DB_NAME || "temp",
   frontend_url: process.env.FRONTEND_URL || "http://localhost:3000",
-
-  twitter_consumer_key: process.env.TWITTER_API_KEY as string,
-  twitter_consumer_secret: process.env.TWITTER_SECRET as string,
-  twitter_access_token_key: process.env.TWITTER_ACCESS_TOKEN as string,
-  twitter_access_token_secret: process.env
-    .TWITTER_ACCESS_TOKEN_SECRET as string,
-  twitter_bearer_token: process.env.TWITTER_BEARER_TOKEN as string,
 };
 export default config;
 
@@ -50,7 +44,7 @@ export async function getHoneycomb(
   }
 
   const honeycomb = new Honeycomb(new web3.Connection(RPC, opts), {
-    env: process.env.HONEYCOMB_ENV || "main",
+    env: config.honeycomb_env,
   });
   honeycomb.use(
     identityModule(web3.Keypair.fromSecretKey(Uint8Array.from(project.driver)))
@@ -65,15 +59,32 @@ export async function getHoneycomb(
   return honeycomb;
 }
 
-export function twitterClient() {
-  return new Twitter({
-    subdomain: "api",
-    version: "2",
-    extension: false,
-    consumer_key: config.twitter_consumer_key,
-    consumer_secret: config.twitter_consumer_secret,
-    // bearer_token: config.twitter_bearer_token,
-    access_token_key: config.twitter_access_token_key,
-    access_token_secret: config.twitter_access_token_secret,
-  });
-}
+export const getMissionsProgram = (honeycomb: Honeycomb) => {
+  const provider = new anchor.AnchorProvider(
+    honeycomb.connection,
+    honeycomb.identity(),
+    {
+      preflightCommitment: "confirmed",
+    }
+  );
+
+  const program = new anchor.Program<Missions>(
+    MissionsIDL,
+    new web3.PublicKey(
+      honeycomb.cluster === "devnet"
+        ? "GcH5bF7WpUfAF5TjdKNPbetUvKCJdeZ65AnaYVxwpiha"
+        : "HkoqNP2KcgiH5bzWWaSUFA8AsGyb7M9zRyJEhKnezSrv"
+    ),
+    provider
+  );
+
+  return {
+    missionsCoder: new anchor.BorshAccountsCoder(program.idl),
+    missionsProgram: program,
+    missionsKey: new web3.PublicKey(
+      honeycomb.cluster === "devnet"
+        ? "CWoCehkYMbZmnTxJne8LaQx58J8qDHVYFHyi5nHHwSeF"
+        : "9hk4HB85mKJHs2pbx2RpDZGeMjTsKhjknf7ibzFwCvmA"
+    ),
+  };
+};

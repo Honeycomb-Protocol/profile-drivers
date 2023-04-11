@@ -8,7 +8,7 @@ import routes from "./controllers";
 import * as models from "./models";
 import { connectDB } from "./utils";
 import { Request } from "./types";
-import config, { getHoneycomb, twitterClient } from "./config";
+import config, { getHoneycomb } from "./config";
 import { buildEntityRoute } from "./controllers/entity";
 import sessionStore from "./session-store";
 import { refreshData, startSocket } from "./sockets";
@@ -50,14 +50,12 @@ app.use(
 );
 
 (async () => {
-  const honeycomb = await getHoneycomb("devnet");
+  const honeycomb = await getHoneycomb("solpatrol");
   const orm = await connectDB(honeycomb.project().address.toString() + "_db");
-  const twitter = twitterClient();
 
   app.use((req: Request, _res, next) => {
     req.orm = orm;
     req.honeycomb = honeycomb;
-    req.twitter = twitter;
     next();
   });
 
@@ -75,7 +73,8 @@ app.use(
     }
   });
 
-  refreshData(honeycomb, orm, twitter).then((_) => startSocket(honeycomb, orm));
+  startSocket(honeycomb, orm);
+  refreshData(honeycomb, orm);
 
   app.use(routes);
 

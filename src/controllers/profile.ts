@@ -1,5 +1,5 @@
 import express, { Handler } from "express";
-import { Profile, Wallets } from "../models";
+import { Profile } from "../models";
 import { Request } from "../types";
 import { ResponseHelper } from "../utils";
 
@@ -13,20 +13,13 @@ const getProfile: Handler = (req: Request, res) => {
           address: req.params.identity,
         },
         {
-          useraddress: req.params.identity,
-        },
-        {
-          wallets: {
-            $like: `%${req.params.identity}%`,
-          },
+          userAddress: req.params.identity,
         },
       ],
     })
     .then((profile) => {
       if (!profile) return response.notFound();
       const profileNew = profile.toJSON();
-      //@ts-ignore
-      profileNew.wallets = Wallets.parse(profile.wallets);
       return response.ok(undefined, profileNew);
     })
     .catch((e) => response.error(e.message));
@@ -42,8 +35,6 @@ const getProfiles: Handler = (req: Request, res) => {
         undefined,
         profiles.map((p) => {
           const profile = p.toJSON();
-          //@ts-ignore
-          profile.wallets = Wallets.parse(profile.wallets);
           return profile;
         })
       )
