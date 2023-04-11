@@ -50,7 +50,7 @@ app.use(
 );
 
 (async () => {
-  const honeycomb = await getHoneycomb("devnet");
+  const honeycomb = await getHoneycomb("twitter");
   const orm = await connectDB(honeycomb.project().address.toString() + "_db");
   const twitter = twitterClient();
 
