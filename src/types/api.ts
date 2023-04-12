@@ -17,4 +17,5 @@ export type Request = ExpressRequest & {
   steam?: SteamAuth;
   profile?: any;
   session?: any;
+  user?: any
 };

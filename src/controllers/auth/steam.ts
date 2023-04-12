@@ -1,54 +1,77 @@
+import * as web3 from "@solana/web3.js";
 import express, { Response } from "express";
 import { Request } from "../../types";
 import { ResponseHelper } from "../../utils";
 import { Profile, Wallets } from "../../models";
-import { fetchAllEntitiesFor } from "../../sockets";
+import { fetchAllEntitiesFor, fetchAndSaveSingleProfileByUserAddress, saveProfile } from "../../sockets";
+import { authenticate } from "../../middlewares";
+import { IdentityProfile, getProfilePda } from "@honeycomb-protocol/hive-control";
 
 const router = express.Router();
 
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", authenticate, async (req: Request, res: Response) => {
     const response = new ResponseHelper(res);
-
-    if (!req.session.web3User || !req.steam)
+    console.log("req", req.user, req.steam)
+    if (!req.user || !req.steam)
         return response.error("web3User not found in session.");
     try {
         const redirectUrl = await req.steam.getRedirectUrl();
-        res.redirect(
-            redirectUrl
+        res.send(
+            {
+                steamUrl: redirectUrl,
+            }
         );
     } catch (err: any) {
         console.error(err);
         response.error(err.message);
     }
 });
-router.get("/callback", async (req: Request, res: Response) => {
+router.get("/callback", authenticate, async (req: Request, res: Response) => {
     const response = new ResponseHelper(res);
-
-    if (!req.session.web3User || !req.orm || !req.honeycomb || !req.steam)
+    if (!req.user || !req.orm || !req.honeycomb || !req.steam)
         return response.error("web3User not found in session.");
 
-    const profile = await req.orm.em.findOne(Profile, {
-        address: req.session.web3User.address,
-    });
+    let profile: Profile = await req.orm.em.findOne(Profile, {
+        useraddress: req.user.address,
+    }) as any;
+    if (!profile) profile = await fetchAndSaveSingleProfileByUserAddress(req.honeycomb, new web3.PublicKey(req.user.address), req.orm) as Profile;
 
-    if (!profile) {
-        return response.error("Profile not found!");
-    }
-    console.log(profile)
-    if (profile.steamId && profile.steamUsername) {
-        return response.conflict(
-            "Steam credentials already set for this profile"
-        );
-    }
+    // let profileChain: IdentityProfile;
+    // if (!profile) {
+    //     profileChain = await req.honeycomb
+    //       .identity()
+    //       .fetch()
+    //       .profile(
+    //         req.honeycomb.project().address,
+    //         new web3.PublicKey(req.user.address)
+    //       );
+    
+    //     if (!profileChain) return response.notFound("Profile not found!");
+    
+    //     profile = await saveProfile(
+    //       req.honeycomb,
+    //       req.orm,
+    //       getProfilePda(req.honeycomb.project().address, req.user.address)[0],
+    //       profileChain.profile()
+    //     );
+    //   }
+
+    if (!profile) return response.error("Profile not found!");
+    // if (profile.steamId && profile.steamUsername) {
+    //     return response.conflict(
+    //         "Steam credentials already set for this profile"
+    //     );
+    // }
     try {
         const user = await req.steam.authenticate(req);
-
-        //@ts-ignore
-        const { primary_wallet } = Wallets.parse(profile.wallets);
         const profileChain = await req.honeycomb
             .identity()
             .fetch()
-            .profile(req.honeycomb.project().address, primary_wallet);
+            .profile(
+                req.honeycomb.project().address,
+                new web3.PublicKey(profile.useraddress),
+                profile.identity
+              );
 
         await profileChain.add("steamId", user.steamid).then((_) => {
             profile.steamId = user.steamid;
@@ -64,9 +87,9 @@ router.get("/callback", async (req: Request, res: Response) => {
 
 
         response.ok("Steam Auth Success!");
-    } catch (err) {
+    } catch (err: any) {
         console.error(err);
-        res.sendStatus(500);
+        response.error(err.message, err);
     }
 });
 

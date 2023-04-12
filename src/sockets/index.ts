@@ -84,7 +84,8 @@ export async function saveProfile(
   honeycomb: Honeycomb,
   orm: MikroORM,
   profileAddress: web3.PublicKey,
-  profileChain: ProfileChain
+  profileChain: ProfileChain,
+  doNotFetchData: boolean = false
 ) {
   let profile = await orm.em.findOne(Profile, {
     address: profileAddress,
@@ -97,6 +98,7 @@ export async function saveProfile(
     );
 
     profile = new Profile(profileAddress);
+    profile.identity = profileChain.identity;
     profile.useraddress = profileChain.user;
     //@ts-ignore
     profile.wallets = Wallets.from({
@@ -118,7 +120,8 @@ export async function saveProfile(
   }
 
   await orm.em.flush();
-  await fetchAllEntitiesFor(honeycomb, orm, profile);
+  if(!doNotFetchData) await fetchAllEntitiesFor(honeycomb, orm, profile);
+  return profile;
 }
 
 export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
@@ -144,6 +147,21 @@ export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
       );
     });
 }
+export async function fetchAndSaveSingleProfileByUserAddress(honeycomb: Honeycomb, userAddress: web3.PublicKey, orm: MikroORM) {
+  console.log("Refreshing Profiles...");
+  const [profileChain] =  await ProfileChain.gpaBuilder()
+    .addFilter("project", honeycomb.project().address)
+    .addFilter("user", userAddress)
+    .run(honeycomb.connection);
+    if (!profileChain) return null;
+    return await saveProfile(
+      honeycomb,
+      orm,
+      profileChain.pubkey,
+      ProfileChain.fromAccountInfo(profileChain.account)[0],
+      true
+    );
+}
 
 const waiting = (ms = 1000): Promise<boolean> => {
   return new Promise((resolve) => {
@@ -158,12 +176,10 @@ export async function fetchFriendList(
   orm: MikroORM,
   profile: Profile,
 ) {
-  //@ts-ignore
-  const { primary_wallet } = Wallets.parse(profile.wallets);
   const profileObj = await honeycomb
     .identity()
     .fetch()
-    .profile(undefined, primary_wallet);
+    .profile(undefined, new web3.PublicKey(profile.useraddress), profile.identity);
   const tree = profileObj.entity<ISteamFriend>("SteamFriend");
   tree.setLeaves(
     await orm.em
@@ -234,11 +250,10 @@ export async function fetchCollectible(
   game: SteamOwnedGames,
 ) {
   //@ts-ignore
-  const { primary_wallet } = Wallets.parse(profile.wallets);
   const profileObj = await honeycomb
     .identity()
     .fetch()
-    .profile(undefined, primary_wallet);
+    .profile(undefined, new web3.PublicKey(profile.useraddress), profile.identity);
   const tree = profileObj.entity<ISteamGameCollectible>("SteamOwnedCollectible");
   tree.setLeaves(
     await orm.em
@@ -357,7 +372,7 @@ export async function fetchGamePlayerStats(
   const profileObj = await honeycomb
     .identity()
     .fetch()
-    .profile(undefined, primary_wallet);
+    .profile(undefined, new web3.PublicKey(profile.useraddress), profile.identity);
   const stats = profileObj.entity<ISteamGamePlayerStat>("SteamGamePlayerStat");
   stats.setLeaves(
     await orm.em
@@ -447,7 +462,7 @@ export async function fetchGameAchievements(
   const profileObj = await honeycomb
     .identity()
     .fetch()
-    .profile(undefined, primary_wallet);
+    .profile(undefined, new web3.PublicKey(profile.useraddress), profile.identity);
   const achievements = profileObj.entity<ISteamAchievements>("SteamAchievements");
   achievements.setLeaves(
     await orm.em
@@ -540,7 +555,7 @@ export async function fetchOwnedGamesDetails(
   const profileObj = await honeycomb
     .identity()
     .fetch()
-    .profile(undefined, primary_wallet);
+    .profile(undefined, new web3.PublicKey(profile.useraddress), profile.identity);
   const tree = profileObj.entity<ISteamOwnedGames>("SteamOwnedGames");
   tree.setLeaves(
     await orm.em

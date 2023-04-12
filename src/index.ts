@@ -13,13 +13,14 @@ import { buildEntityRoute } from "./controllers/entity";
 import sessionStore from "./session-store";
 import { refreshData, startSocket } from "./sockets";
 import crons from "./crons";
+import { bypass_authenticate } from "./middlewares";
 
 dotenv.config();
 
 const app = express();
 const port = config.port;
 
-app.use(cors());
+app.use(cors({ origin: config.cors_origin, credentials: true }));
 
 app.use(morgan("dev"));
 
@@ -43,6 +44,7 @@ app.use(
     // cookie: { secure: true },
   })
 );
+
 
 (async () => {
   const honeycomb = await getHoneycomb("devnet");
@@ -71,6 +73,7 @@ app.use(
 
   refreshData(honeycomb, orm).then(() => startSocket(honeycomb, orm));
 
+  app.use(bypass_authenticate);
   app.use(routes);
   crons();
 

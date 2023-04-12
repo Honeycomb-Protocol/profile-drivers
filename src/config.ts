@@ -11,10 +11,11 @@ import {
 import SteamAuth from 'node-steam-openid';
 
 dotenv.config();
-
+console.log("poprt", process.env.PORT)
 const config = {
   node_env: process.env.NODE_ENV,
-  port: process.env.PORT || 4000,
+  port: process.env.PORT || 4001,
+  honeycomb_env: process.env.HONEYCOMB_ENV || "dev",
   cors_origin: process.env.CORS_ORIGIN || "*",
   request_limit: process.env.REQUEST_LIMIT || "100kb",
   jwt_secret: process.env.JWT_SECRET || "secret",
@@ -43,7 +44,7 @@ export async function getHoneycomb(
     };
   }
 
-  const honeycomb = new Honeycomb(new web3.Connection(RPC, opts));
+  const honeycomb = new Honeycomb(new web3.Connection(RPC, opts), { env: config.honeycomb_env });
   honeycomb.use(
     identityModule(web3.Keypair.fromSecretKey(Uint8Array.from(project.driver)))
   );
@@ -63,8 +64,8 @@ export async function getHoneycomb(
 
 export function steamClient() {
   return new SteamAuth({
-    realm: 'http://127.0.0.1:3000', // Site name displayed to users on logon
-    returnUrl: 'http://127.0.0.1:3000/steam/auth/callback', // Your return route
+    realm: 'http:/localhost:3000', // Site name displayed to users on logon
+    returnUrl: 'http:/localhost:3000/edit/profiles/steam/callback', // Your return route
     apiKey: config.steam_api_key, // Steam API key
   });
 }

@@ -73,10 +73,13 @@ export class Profile
   address!: PublicKey;
 
   @Property()
-  useraddress!: PublicKey;
+  useraddress!: PublicKey
 
   @Property()
   wallets!: Wallets;
+
+  @Property()
+  identity!: string;
 
   @Property({
     nullable: true,
