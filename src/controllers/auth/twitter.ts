@@ -35,7 +35,7 @@ router.post("/", authenticate, async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error(err);
-    response.error(err.message);
+    response.error(err.errors[0]?.message);
   }
 });
 router.post("/callback", authenticate, async (req: Request, res: Response) => {
