@@ -11,7 +11,7 @@ import { Request } from "./types";
 import config, { getHoneycomb } from "./config";
 import { buildEntityRoute } from "./controllers/entity";
 import sessionStore from "./session-store";
-import { refreshData, startSocket } from "./sockets";
+import { refreshData, startMissionsSocket, startSocket } from "./sockets";
 
 dotenv.config();
 
@@ -74,6 +74,7 @@ app.use(
   });
 
   startSocket(honeycomb, orm);
+  startMissionsSocket(honeycomb, orm);
   refreshData(honeycomb, orm);
 
   app.use(routes);

@@ -4,6 +4,7 @@ import {
   Honeycomb,
   IdentityProfile,
   Profile as ProfileChain,
+  getProfilePda,
   profileDiscriminator,
 } from "@honeycomb-protocol/hive-control";
 import { MikroORM } from "@mikro-orm/core";
@@ -32,6 +33,7 @@ const userLevelCalc = (xp: number) => {
 };
 
 export async function saveProfile(
+  honeycomb: Honeycomb,
   orm: MikroORM,
   profileAddress: web3.PublicKey,
   profileChain: ProfileChain
@@ -55,23 +57,101 @@ export async function saveProfile(
     orm.em.persist(profile);
   }
 
+  // if (
+  //   profileChain.data.get("xp") === undefined ||
+  //   profileChain.data.get("level") === undefined ||
+  //   profileChain.data.get("bounty") === undefined ||
+  //   profileChain.data.get("resource1") === undefined ||
+  //   profileChain.data.get("resource2") === undefined ||
+  //   profileChain.data.get("resource3") === undefined
+  // ) {
+  //   const identityProfile = honeycomb.identity().register(profileChain);
+
+  //   const user = await honeycomb.identity().fetch().user(identityProfile.user);
+
+  //   let wallet: web3.PublicKey | undefined;
+  //   if (
+  //     user.primaryWallet
+  //       .toString()
+  //       .startsWith(identityProfile.profile().identity)
+  //   ) {
+  //     wallet = user.primaryWallet;
+  //   } else {
+  //     wallet = user.secondaryWallets.find((w) =>
+  //       w.toString().startsWith(identityProfile.profile().identity)
+  //     );
+  //   }
+
+  //   if (wallet) {
+  //     const { missionsKey, missionsProgram } = await getMissionsProgram(
+  //       honeycomb
+  //     );
+
+  //     const [userAddress] = web3.PublicKey.findProgramAddressSync(
+  //       [Buffer.from("user"), wallet.toBuffer(), missionsKey.toBuffer()],
+  //       missionsProgram.programId
+  //     );
+
+  //     const userAccount = await missionsProgram.account.userAccount.fetch(
+  //       userAddress
+  //     );
+
+  //     if (!profileChain.data.get("xp")) {
+  //       await identityProfile.add("xp", userAccount.xp.toString()).catch();
+  //     }
+
+  //     if (!profileChain.data.get("level")) {
+  //       await identityProfile
+  //         .add(
+  //           "level",
+  //           userLevelCalc(userAccount.xp.toNumber()).level.toString()
+  //         )
+  //         .catch();
+  //     }
+
+  //     if (!profileChain.data.get("bounty")) {
+  //       await identityProfile
+  //         .add("bounty", userAccount.bounty.toString())
+  //         .catch();
+  //     }
+
+  //     if (!profileChain.data.get("resource1")) {
+  //       await identityProfile
+  //         .add("resource1", userAccount.resource1.toString())
+  //         .catch();
+  //     }
+
+  //     if (!profileChain.data.get("resource2")) {
+  //       await identityProfile
+  //         .add("resource2", userAccount.resource2.toString())
+  //         .catch();
+  //     }
+
+  //     if (!profileChain.data.get("resource3")) {
+  //       await identityProfile
+  //         .add("resource3", userAccount.resource3.toString())
+  //         .catch();
+  //     }
+  //   }
+  // }
+
   profile.xp = parseInt(
-    (profileChain.data.get("missions_xp") || "0") as string
+    ((profileChain.data.get("xp") as any).value || "0") as string
   );
   profile.level = parseInt(
-    (profileChain.data.get("missions_level") || "0") as string
+    ((profileChain.data.get("level") as any).value || "0") as string
   );
   profile.bounty = parseInt(
-    (profileChain.data.get("missions_bounty") || "0") as string
+    ((profileChain.data.get("bounty") as any).value || "0") as string
   );
   profile.resource1 = parseInt(
-    (profileChain.data.get("missions_resource1") || "0") as string
+    ((profileChain.data.get("resource1") as any).value || "0") as string
   );
   profile.resource2 = parseInt(
-    (profileChain.data.get("missions_resource2") || "0") as string
+    ((profileChain.data.get("resource2") as any).value || "0") as string
   );
   profile.resource3 = parseInt(
-    (profileChain.data.get("missions_resource3") || "0") as string
+    ((profileChain.data.get("resource3") as any).value || "0") as string
   );
 
   await orm.em.flush();
@@ -84,11 +164,12 @@ export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
     .addFilter("project", honeycomb.project().address)
     .run(honeycomb.connection)
     .then((profilesChain) => {
-      console.log(profilesChain.length);
+      console.log("P", profilesChain.length);
       return Promise.all(
         profilesChain.map(async (profileChain) => {
           try {
             await saveProfile(
+              honeycomb,
               orm,
               profileChain.pubkey,
               ProfileChain.fromAccountInfo(profileChain.account)[0]
@@ -99,6 +180,25 @@ export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
         })
       );
     });
+}
+
+export async function fetchAndSaveSingleProfileByUserAddress(
+  honeycomb: Honeycomb,
+  userAddress: web3.PublicKey,
+  orm: MikroORM
+) {
+  console.log("Refreshing Profiles...");
+  const [profileChain] = await ProfileChain.gpaBuilder()
+    .addFilter("project", honeycomb.project().address)
+    .addFilter("user", userAddress)
+    .run(honeycomb.connection);
+  if (!profileChain) return null;
+  return await saveProfile(
+    honeycomb,
+    orm,
+    profileChain.pubkey,
+    ProfileChain.fromAccountInfo(profileChain.account)[0]
+  );
 }
 
 export async function setSolPatrolStats(
@@ -118,7 +218,9 @@ export async function setSolPatrolStats(
   try {
     await Promise.all(
       Object.entries(data).map(async ([key, value]) =>
-        profile.set(key, value.toString())
+        profile.get(key) === undefined
+          ? profile.add(key, value.toString())
+          : profile.set(key, value.toString())
       )
     );
   } catch (e) {
@@ -126,42 +228,55 @@ export async function setSolPatrolStats(
   }
 }
 
-export function fetchSolpatrolUsers(honeycomb: Honeycomb) {
+export async function fetchSolpatrolUsers(honeycomb: Honeycomb, orm: MikroORM) {
   const { missionsProgram } = getMissionsProgram(honeycomb);
 
-  return missionsProgram.account.userAccount
+  const userAccounts = await missionsProgram.account.userAccount
     .all()
     .then((x) => {
       console.log("SP", x.length);
       return x;
-    })
-    .then((x) =>
-      Promise.all(
-        x.map(async (u) => {
-          try {
-            const { user } = await honeycomb
-              .identity()
-              .fetch()
-              .walletResolver(u.account.wallet);
-            const profile = await honeycomb
-              .identity()
-              .fetch()
-              .profile(
-                undefined,
-                user,
-                u.account.wallet.toString().slice(0, 5)
-              );
+    });
 
-            setSolPatrolStats(u, profile);
-          } catch {}
-        })
-      )
-    );
+  const publicInfo = await honeycomb.publicInfo();
+  const authDriver = publicInfo.get("auth_driver_offchain");
+
+  if (!authDriver) {
+    console.error("Auth driver not set");
+    return;
+  }
+
+  for (let u of userAccounts) {
+    try {
+      const { success, data: user } = await honeycomb
+        .http()
+        .get(`${authDriver}/user/${u.account.wallet.toString()}`);
+      if (!success) continue;
+      if (!user) continue;
+
+      const profile = await orm.em.findOne(Profile, {
+        userAddress: user.address,
+      });
+      if (!profile) continue;
+
+      const identityProfile = await honeycomb
+        .identity()
+        .fetch()
+        .profile(
+          honeycomb.project().address,
+          new web3.PublicKey(user.address),
+          u.account.wallet.toString().slice(0, 5)
+        );
+      if (!identityProfile) continue;
+      console.log("identityProfile", identityProfile.identity());
+      await setSolPatrolStats(u.account, identityProfile);
+    } catch {}
+  }
 }
 
 export async function refreshData(honeycomb: Honeycomb, orm: MikroORM) {
   await fetchProfiles(honeycomb, orm);
-  await fetchSolpatrolUsers(honeycomb);
+  await fetchSolpatrolUsers(honeycomb, orm);
 }
 
 export function startSocket(honeycomb: Honeycomb, orm: MikroORM) {
@@ -181,7 +296,7 @@ export function startSocket(honeycomb: Honeycomb, orm: MikroORM) {
         )[0];
         if (profileChain.project.equals(honeycomb.project().projectAddress)) {
           console.log(`Profile ${account.accountId.toString()} data changed`);
-          await saveProfile(orm, account.accountId, profileChain);
+          await saveProfile(honeycomb, orm, account.accountId, profileChain);
         }
       } catch {}
     }
@@ -191,7 +306,7 @@ export function startSocket(honeycomb: Honeycomb, orm: MikroORM) {
 export function startMissionsSocket(honeycomb: Honeycomb, orm: MikroORM) {
   console.log("Started missions sockets...");
   const { missionsCoder, missionsProgram } = getMissionsProgram(honeycomb);
-  return honeycomb.processedConnection.onProgramAccountChange(
+  return missionsProgram.provider.connection.onProgramAccountChange(
     missionsProgram.programId,
     async (account) => {
       try {

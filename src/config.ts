@@ -61,7 +61,8 @@ export async function getHoneycomb(
 
 export const getMissionsProgram = (honeycomb: Honeycomb) => {
   const provider = new anchor.AnchorProvider(
-    honeycomb.connection,
+    new web3.Connection("https://api.metaplex.solana.com") ||
+      honeycomb.connection,
     honeycomb.identity(),
     {
       preflightCommitment: "confirmed",
@@ -71,7 +72,7 @@ export const getMissionsProgram = (honeycomb: Honeycomb) => {
   const program = new anchor.Program<Missions>(
     MissionsIDL,
     new web3.PublicKey(
-      honeycomb.cluster === "devnet"
+      false && honeycomb.cluster === "devnet"
         ? "GcH5bF7WpUfAF5TjdKNPbetUvKCJdeZ65AnaYVxwpiha"
         : "HkoqNP2KcgiH5bzWWaSUFA8AsGyb7M9zRyJEhKnezSrv"
     ),
@@ -82,7 +83,7 @@ export const getMissionsProgram = (honeycomb: Honeycomb) => {
     missionsCoder: new anchor.BorshAccountsCoder(program.idl),
     missionsProgram: program,
     missionsKey: new web3.PublicKey(
-      honeycomb.cluster === "devnet"
+      false && honeycomb.cluster === "devnet"
         ? "CWoCehkYMbZmnTxJne8LaQx58J8qDHVYFHyi5nHHwSeF"
         : "9hk4HB85mKJHs2pbx2RpDZGeMjTsKhjknf7ibzFwCvmA"
     ),
