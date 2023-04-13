@@ -98,6 +98,25 @@ export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
     });
 }
 
+export async function fetchAndSaveSingleProfileByUserAddress(
+  honeycomb: Honeycomb,
+  userAddress: web3.PublicKey,
+  orm: MikroORM
+) {
+  console.log("Refreshing Profiles...");
+  const [profileChain] = await ProfileChain.gpaBuilder()
+    .addFilter("project", honeycomb.project().address)
+    .addFilter("user", userAddress)
+    .run(honeycomb.connection);
+  if (!profileChain) return null;
+  return await saveProfile(
+    honeycomb,
+    orm,
+    profileChain.pubkey,
+    ProfileChain.fromAccountInfo(profileChain.account)[0]
+  );
+}
+
 export async function fetchTweets(
   honeycomb: Honeycomb,
   orm: MikroORM,

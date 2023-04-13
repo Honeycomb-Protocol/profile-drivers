@@ -10,7 +10,10 @@ import {
   IdentityProfile,
   getProfilePda,
 } from "@honeycomb-protocol/hive-control";
-import { saveProfile } from "../../sockets";
+import {
+  fetchAndSaveSingleProfileByUserAddress,
+  saveProfile,
+} from "../../sockets";
 
 const router = express.Router();
 
@@ -47,24 +50,15 @@ router.post("/callback", authenticate, async (req: Request, res: Response) => {
 
   let profileChain: IdentityProfile;
   if (!profile) {
-    try {
-      profileChain = await req.honeycomb
-        .identity()
-        .fetch()
-        .profile(
-          req.honeycomb.project().address,
-          new web3.PublicKey(req.user.address)
-        );
-    } catch {
+    profile = await fetchAndSaveSingleProfileByUserAddress(
+      req.honeycomb,
+      new web3.PublicKey(req.user.address),
+      req.orm
+    );
+
+    if (!profile) {
       return response.notFound("Profile not found!");
     }
-
-    profile = await saveProfile(
-      req.honeycomb,
-      req.orm,
-      getProfilePda(req.honeycomb.project().address, req.user.address)[0],
-      profileChain.profile()
-    );
   }
 
   if (profile.twitterId || profile.twitterUsername) {
