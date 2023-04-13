@@ -47,15 +47,17 @@ router.post("/callback", authenticate, async (req: Request, res: Response) => {
 
   let profileChain: IdentityProfile;
   if (!profile) {
-    profileChain = await req.honeycomb
-      .identity()
-      .fetch()
-      .profile(
-        req.honeycomb.project().address,
-        new web3.PublicKey(req.user.address)
-      );
-
-    if (!profileChain) return response.notFound("Profile not found!");
+    try {
+      profileChain = await req.honeycomb
+        .identity()
+        .fetch()
+        .profile(
+          req.honeycomb.project().address,
+          new web3.PublicKey(req.user.address)
+        );
+    } catch {
+      return response.notFound("Profile not found!");
+    }
 
     profile = await saveProfile(
       req.honeycomb,
