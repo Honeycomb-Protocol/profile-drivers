@@ -136,22 +136,22 @@ export async function saveProfile(
   // }
 
   profile.xp = parseInt(
-    ((profileChain.data.get("xp") as any).value || "0") as string
+    ((profileChain.data.get("xp") as any)?.value || "0") as string
   );
   profile.level = parseInt(
-    ((profileChain.data.get("level") as any).value || "0") as string
+    ((profileChain.data.get("level") as any)?.value || "0") as string
   );
   profile.bounty = parseInt(
-    ((profileChain.data.get("bounty") as any).value || "0") as string
+    ((profileChain.data.get("bounty") as any)?.value || "0") as string
   );
   profile.resource1 = parseInt(
-    ((profileChain.data.get("resource1") as any).value || "0") as string
+    ((profileChain.data.get("resource1") as any)?.value || "0") as string
   );
   profile.resource2 = parseInt(
-    ((profileChain.data.get("resource2") as any).value || "0") as string
+    ((profileChain.data.get("resource2") as any)?.value || "0") as string
   );
   profile.resource3 = parseInt(
-    ((profileChain.data.get("resource3") as any).value || "0") as string
+    ((profileChain.data.get("resource3") as any)?.value || "0") as string
   );
 
   await orm.em.flush();
@@ -268,7 +268,7 @@ export async function fetchSolpatrolUsers(honeycomb: Honeycomb, orm: MikroORM) {
           u.account.wallet.toString().slice(0, 5)
         );
       if (!identityProfile) continue;
-      console.log("identityProfile", identityProfile.identity());
+
       await setSolPatrolStats(u.account, identityProfile);
     } catch {}
   }
