@@ -6,6 +6,7 @@ import { Profile, Wallets } from "../../models";
 import { fetchAllEntitiesFor, fetchAndSaveSingleProfileByUserAddress, saveProfile } from "../../sockets";
 import { authenticate } from "../../middlewares";
 import { IdentityProfile, getProfilePda } from "@honeycomb-protocol/hive-control";
+import config from "../../config";
 
 const router = express.Router();
 
@@ -45,9 +46,9 @@ router.get("/callback", authenticate, async (req: Request, res: Response) => {
     //         req.honeycomb.project().address,
     //         new web3.PublicKey(req.user.address)
     //       );
-    
+
     //     if (!profileChain) return response.notFound("Profile not found!");
-    
+
     //     profile = await saveProfile(
     //       req.honeycomb,
     //       req.orm,
@@ -64,6 +65,12 @@ router.get("/callback", authenticate, async (req: Request, res: Response) => {
     // }
     try {
         const user = await req.steam.authenticate(req);
+        const url = `https://api.steampowered.com/IPlayerService/GetSteamLevel/v1/?key=${config.steam_api_key}&steamid=${user.steamid}`;
+        const { player_level } = await req.honeycomb.http().get(url).then(res => {
+            return (res.response || {}) as {
+                "player_level": number
+            }
+        });
         const profileChain = await req.honeycomb
             .identity()
             .fetch()
@@ -71,10 +78,14 @@ router.get("/callback", authenticate, async (req: Request, res: Response) => {
                 req.honeycomb.project().address,
                 new web3.PublicKey(profile.useraddress),
                 profile.identity
-              );
+            );
 
         await profileChain.add("steamId", user.steamid).then((_) => {
             profile.steamId = user.steamid;
+        }).catch(console.error);
+
+        await profileChain.add("steamLevel", player_level.toString()).then((_) => {
+            profile.steamLevel = player_level;
         }).catch(console.error);
 
         await profileChain.add("steamUsername", user.username || user.name).then((_) => {

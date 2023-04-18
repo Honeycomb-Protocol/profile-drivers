@@ -90,6 +90,10 @@ export class Profile
     nullable: true,
   })
   steamUsername!: string;
+  @Property({
+    nullable: true,
+  })
+  steamLevel!: number;
 
   @OneToMany(() => SteamFriend, (steamFriend) => steamFriend.profile)
   friends = new Collection<SteamFriend>(this);
