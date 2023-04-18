@@ -5,6 +5,7 @@ import { Request } from "../types";
 import { ResponseHelper } from "../utils";
 import { authenticate } from "../middlewares";
 import { SteamAssetClassInfo } from "../models/SteamAssetClassInfo";
+import { SteamUser } from "../models/SteamUser";
 
 const getFriends: Handler = (req: Request, res) => {
   const response = new ResponseHelper(res);
@@ -24,10 +25,20 @@ const getFriends: Handler = (req: Request, res) => {
         ]
       }
     })
-    .then((friends) => {
+    .then(async (friends) => {
+      let users = await req.orm?.em
+        .find(SteamUser, {
+          steamId: friends.map((item) => item.steamId)
+        });
       if (!friends) return response.notFound();
       // const friendsNew = friends.toJSON();
-      return response.ok(undefined, friends);
+      return response.ok(undefined, {
+        friends: friends.map((item) => {
+          let user = users?.find((user) => user.steamId === item.steamId);
+          if (user) return { ...item, ...user };
+          else return item;
+        })
+      });
     })
     .catch((e) => response.error(e.message));
 };
