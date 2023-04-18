@@ -4,33 +4,11 @@ import {
   Honeycomb,
   IdentityProfile,
   Profile as ProfileChain,
-  getProfilePda,
   profileDiscriminator,
 } from "@honeycomb-protocol/hive-control";
 import { MikroORM } from "@mikro-orm/core";
-import { Profile } from "../models";
+import { IParticipation, Participations, Profile } from "../models";
 import { getMissionsProgram } from "../config";
-
-const userLevelCalc = (xp: number) => {
-  let level = {
-    level: 0,
-    next: 0,
-  };
-
-  for (let i = 0; i <= 101; i++) {
-    let check = 25 * (i + i * i);
-    if (xp < check) {
-      level = { level: i - 1, next: check };
-      break;
-    }
-
-    if (check >= 252500) {
-      level = { level: i, next: check };
-      break;
-    }
-  }
-  return level;
-};
 
 export async function saveProfile(
   honeycomb: Honeycomb,
@@ -43,9 +21,35 @@ export async function saveProfile(
   });
 
   if (!profile) {
+    const user = await honeycomb.identity().fetch().user(profileChain.user);
+    let wallet: web3.PublicKey | undefined;
+    if (user.primaryWallet.toString().startsWith(profileChain.identity)) {
+      wallet = user.primaryWallet;
+    } else {
+      wallet = user.secondaryWallets.find((w) =>
+        w.toString().startsWith(profileChain.identity)
+      );
+    }
+    if (!wallet) {
+      console.log(
+        "No wallet found for profile",
+        profileAddress.toString(),
+        profileChain.identity
+      );
+      return;
+    }
+
+    console.log(
+      "New profile",
+      profileAddress.toString(),
+      profileChain.identity,
+      wallet.toString()
+    );
+
     profile = new Profile({
       address: profileAddress,
       userAddress: profileChain.user,
+      wallet,
       identity: profileChain.identity,
       xp: 0,
       level: 0,
@@ -135,27 +139,78 @@ export async function saveProfile(
   //   }
   // }
 
-  profile.xp = parseInt(
-    ((profileChain.data.get("xp") as any)?.value || "0") as string
-  );
-  profile.level = parseInt(
-    ((profileChain.data.get("level") as any)?.value || "0") as string
-  );
-  profile.bounty = parseInt(
-    ((profileChain.data.get("bounty") as any)?.value || "0") as string
-  );
-  profile.resource1 = parseInt(
-    ((profileChain.data.get("resource1") as any)?.value || "0") as string
-  );
-  profile.resource2 = parseInt(
-    ((profileChain.data.get("resource2") as any)?.value || "0") as string
-  );
-  profile.resource3 = parseInt(
-    ((profileChain.data.get("resource3") as any)?.value || "0") as string
-  );
+  profile.xp =
+    parseInt(((profileChain.data.get("xp") as any)?.value || "0") as string) ||
+    0;
+  profile.level =
+    parseInt(
+      ((profileChain.data.get("level") as any)?.value || "0") as string
+    ) || 0;
+  profile.bounty =
+    parseInt(
+      ((profileChain.data.get("bounty") as any)?.value || "0") as string
+    ) || 0;
+  profile.resource1 =
+    parseInt(
+      ((profileChain.data.get("resource1") as any)?.value || "0") as string
+    ) || 0;
+  profile.resource2 =
+    parseInt(
+      ((profileChain.data.get("resource2") as any)?.value || "0") as string
+    ) || 0;
+  profile.resource3 =
+    parseInt(
+      ((profileChain.data.get("resource3") as any)?.value || "0") as string
+    ) || 0;
 
   await orm.em.flush();
   return profile;
+}
+
+export async function saveSolPatrolStats(
+  solpatrolUser: any,
+  profile: IdentityProfile
+) {
+  const xp = solpatrolUser.xp.toNumber() / 100;
+
+  let level = {
+    level: 0,
+    next: 0,
+  };
+
+  for (let i = 0; i <= 101; i++) {
+    let check = 25 * (i + i * i);
+    if (xp < check) {
+      level = { level: i - 1, next: check };
+      break;
+    }
+
+    if (check >= 252500) {
+      level = { level: i, next: check };
+      break;
+    }
+  }
+
+  const data = {
+    xp,
+    level: level.level,
+    bounty: solpatrolUser.bounty.toNumber() / 100,
+    resource1: solpatrolUser.resource1.toNumber() / 100,
+    resource2: solpatrolUser.resource2.toNumber() / 100,
+    resource3: solpatrolUser.resource3.toNumber() / 100,
+  };
+
+  try {
+    await Promise.all(
+      Object.entries(data).map(async ([key, value]) =>
+        profile.get(key) === undefined
+          ? profile.add(key, value.toString())
+          : profile.set(key, value.toString())
+      )
+    );
+  } catch (e) {
+    console.error("Error Saving solpatrol stats", e);
+  }
 }
 
 export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
@@ -175,7 +230,11 @@ export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
               ProfileChain.fromAccountInfo(profileChain.account)[0]
             );
           } catch (e) {
-            console.error(e);
+            console.error(
+              "Error saving profile",
+              profileChain.pubkey.toString(),
+              e
+            );
           }
         })
       );
@@ -199,33 +258,6 @@ export async function fetchAndSaveSingleProfileByUserAddress(
     profileChain.pubkey,
     ProfileChain.fromAccountInfo(profileChain.account)[0]
   );
-}
-
-export async function setSolPatrolStats(
-  solpatrolUser: any,
-  profile: IdentityProfile
-) {
-  const xp = solpatrolUser.xp.toNumber() / 100;
-  const data = {
-    xp: xp,
-    level: userLevelCalc(xp).level,
-    bounty: solpatrolUser.bounty.toNumber() / 100,
-    resource1: solpatrolUser.resource1.toNumber() / 100,
-    resource2: solpatrolUser.resource2.toNumber() / 100,
-    resource3: solpatrolUser.resource3.toNumber() / 100,
-  };
-
-  try {
-    await Promise.all(
-      Object.entries(data).map(async ([key, value]) =>
-        profile.get(key) === undefined
-          ? profile.add(key, value.toString())
-          : profile.set(key, value.toString())
-      )
-    );
-  } catch (e) {
-    console.error(e);
-  }
 }
 
 export async function fetchSolpatrolUsers(honeycomb: Honeycomb, orm: MikroORM) {
@@ -269,17 +301,150 @@ export async function fetchSolpatrolUsers(honeycomb: Honeycomb, orm: MikroORM) {
         );
       if (!identityProfile) continue;
 
-      await setSolPatrolStats(u.account, identityProfile);
+      await saveSolPatrolStats(u.account, identityProfile);
     } catch {}
+  }
+}
+
+export async function fetchParticipationsFor(
+  honeycomb: Honeycomb,
+  orm: MikroORM,
+  profile: Profile
+) {
+  const profileObj = await honeycomb
+    .identity()
+    .fetch()
+    .profile(
+      undefined,
+      new web3.PublicKey(profile.userAddress),
+      profile.identity
+    );
+
+  const participations = await profileObj.entity<IParticipation>(
+    "Participations"
+  );
+  if (!participations) return;
+  participations.setLeaves(
+    await orm.em
+      .find(
+        Participations,
+        {
+          profile: {
+            address: profile.address,
+          },
+        },
+        {
+          orderBy: {
+            index: 1,
+          },
+        }
+      )
+      .then((ps) =>
+        ps.map(
+          (p) =>
+            ({
+              index: p.index,
+              address: new web3.PublicKey(p.address),
+              projectKey: new web3.PublicKey(p.projectKey),
+              wallet: new web3.PublicKey(p.wallet),
+              mint: new web3.PublicKey(p.mint),
+              missionKey: new web3.PublicKey(p.missionKey),
+              startTime: p.startTime,
+              endTime: p.endTime,
+              bounty: p.bounty,
+              xp: p.xp,
+              resource1: p.resource1,
+              resource2: p.resource2,
+              resource3: p.resource3,
+              token: p.token,
+              calculatedRewards: p.calculatedRewards,
+              collectedRewards: p.collectedRewards,
+              isRecalled: p.isRecalled,
+            } as IParticipation)
+        )
+      )
+  );
+
+  const { missionsKey, missionsProgram } = getMissionsProgram(honeycomb);
+  const participationsRaw = await missionsProgram.account.participation.all([
+    {
+      memcmp: {
+        offset: 8,
+        bytes: missionsKey.toString(),
+      },
+    },
+    {
+      memcmp: {
+        offset: 8 + 32,
+        bytes: profile.wallet.toString(),
+      },
+    },
+  ]);
+
+  for (let participationRaw of participationsRaw) {
+    const dbParticipation = await orm.em.findOne(Participations, {
+      address: participationRaw.publicKey,
+    });
+    const storedParticipation = participations.values.find((p) =>
+      p.address.equals(participationRaw.publicKey)
+    );
+    const participation = {
+      index: storedParticipation?.index || participations.values.length,
+      address: participationRaw.publicKey,
+      projectKey: participationRaw.account.projectKey,
+      wallet: participationRaw.account.wallet,
+      mint: participationRaw.account.mint,
+      missionKey: participationRaw.account.missionKey,
+      startTime: new Date(participationRaw.account.startTime.toNumber() * 1000),
+      endTime: new Date(participationRaw.account.endTime.toNumber() * 1000),
+      bounty: participationRaw.account.bounty.toNumber(),
+      xp: participationRaw.account.xp.toNumber(),
+      resource1: participationRaw.account.resource1.toNumber(),
+      resource2: participationRaw.account.resource2.toNumber(),
+      resource3: participationRaw.account.resource3.toNumber(),
+      token: participationRaw.account.token.toNumber(),
+      calculatedRewards: participationRaw.account.calculatedRewards,
+      collectedRewards: participationRaw.account.collectedRewards,
+      isRecalled: participationRaw.account.isRecalled,
+    };
+
+    try {
+      if (storedParticipation) {
+      } else {
+        await participations.add(participation);
+      }
+
+      if (dbParticipation) {
+      } else {
+        await orm.em.persistAndFlush(
+          new Participations(profile.address, participation)
+        );
+      }
+    } catch (e) {
+      console.error(e, "Error while saving participation", participation);
+    }
+  }
+}
+
+export async function fetchAllEntitiesForAllUser(
+  honeycomb: Honeycomb,
+  orm: MikroORM
+) {
+  const profiles = await orm.em.find(Profile, {});
+
+  for (let profile of profiles) {
+    // All Entities for this profile will be fetched here
+    await fetchParticipationsFor(honeycomb, orm, profile);
   }
 }
 
 export async function refreshData(honeycomb: Honeycomb, orm: MikroORM) {
   await fetchProfiles(honeycomb, orm);
   await fetchSolpatrolUsers(honeycomb, orm);
+  await fetchAllEntitiesForAllUser(honeycomb, orm);
 }
 
-export function startSocket(honeycomb: Honeycomb, orm: MikroORM) {
+export function startProfilesSocket(honeycomb: Honeycomb, orm: MikroORM) {
   console.log("Started sockets...");
   return honeycomb.processedConnection.onProgramAccountChange(
     HIVECONTROL_PROGRAM_ID,
@@ -303,8 +468,8 @@ export function startSocket(honeycomb: Honeycomb, orm: MikroORM) {
   );
 }
 
-export function startMissionsSocket(honeycomb: Honeycomb, orm: MikroORM) {
-  console.log("Started missions sockets...");
+export function startMissionsUserSocket(honeycomb: Honeycomb, orm: MikroORM) {
+  console.log("Started mission users sockets...");
   const { missionsCoder, missionsProgram } = getMissionsProgram(honeycomb);
   return missionsProgram.provider.connection.onProgramAccountChange(
     missionsProgram.programId,
@@ -324,7 +489,7 @@ export function startMissionsSocket(honeycomb: Honeycomb, orm: MikroORM) {
           .fetch()
           .profile(undefined, user);
 
-        setSolPatrolStats(userAccount, profile);
+        saveSolPatrolStats(userAccount, profile);
       } catch (e) {
         console.error(e);
       }
@@ -336,6 +501,144 @@ export function startMissionsSocket(honeycomb: Honeycomb, orm: MikroORM) {
       },
       {
         memcmp: missionsCoder.memcmp("userAccount"),
+      },
+    ]
+  );
+}
+
+export function startParticipationsSocket(honeycomb: Honeycomb, orm: MikroORM) {
+  console.log("Started mission participation sockets...");
+  const { missionsCoder, missionsProgram } = getMissionsProgram(honeycomb);
+  return missionsProgram.provider.connection.onProgramAccountChange(
+    missionsProgram.programId,
+    async (account) => {
+      try {
+        const participationRaw = missionsCoder.decode(
+          "participation",
+          account.accountInfo.data
+        );
+
+        console.log("Participation changed", account.accountId);
+
+        const profile = await orm.em.findOne(Profile, {
+          wallet: participationRaw.wallet,
+        });
+
+        if (!profile) return;
+
+        const profileObj = await honeycomb
+          .identity()
+          .fetch()
+          .profile(
+            undefined,
+            new web3.PublicKey(profile.userAddress),
+            profile.identity
+          );
+
+        const participations = await profileObj.entity<IParticipation>(
+          "Participations"
+        );
+        if (!participations) return;
+        participations.setLeaves(
+          await orm.em
+            .find(
+              Participations,
+              {
+                profile: {
+                  address: profile.address,
+                },
+              },
+              {
+                orderBy: {
+                  index: 1,
+                },
+              }
+            )
+            .then((ps) =>
+              ps.map(
+                (p) =>
+                  ({
+                    index: p.index,
+                    address: new web3.PublicKey(p.address),
+                    projectKey: new web3.PublicKey(p.projectKey),
+                    wallet: new web3.PublicKey(p.wallet),
+                    mint: new web3.PublicKey(p.mint),
+                    missionKey: new web3.PublicKey(p.missionKey),
+                    startTime: p.startTime,
+                    endTime: p.endTime,
+                    bounty: p.bounty,
+                    xp: p.xp,
+                    resource1: p.resource1,
+                    resource2: p.resource2,
+                    resource3: p.resource3,
+                    token: p.token,
+                    calculatedRewards: p.calculatedRewards,
+                    collectedRewards: p.collectedRewards,
+                    isRecalled: p.isRecalled,
+                  } as IParticipation)
+              )
+            )
+        );
+
+        const dbParticipation = await orm.em.findOne(Participations, {
+          address: account.accountId,
+        });
+        const storedParticipation = participations.values.find((p) =>
+          p.address.equals(account.accountId)
+        );
+        const participation = {
+          index: storedParticipation?.index || participations.values.length,
+          address: account.accountId,
+          projectKey: participationRaw.projectKey,
+          wallet: participationRaw.wallet,
+          mint: participationRaw.mint,
+          missionKey: participationRaw.missionKey,
+          startTime: new Date(participationRaw.startTime.toNumber() * 1000),
+          endTime: new Date(participationRaw.endTime.toNumber() * 1000),
+          bounty: participationRaw.bounty.toNumber(),
+          xp: participationRaw.xp.toNumber(),
+          resource1: participationRaw.resource1.toNumber(),
+          resource2: participationRaw.resource2.toNumber(),
+          resource3: participationRaw.resource3.toNumber(),
+          token: participationRaw.token.toNumber(),
+          calculatedRewards: participationRaw.calculatedRewards,
+          collectedRewards: participationRaw.collectedRewards,
+          isRecalled: participationRaw.isRecalled,
+        };
+
+        try {
+          if (storedParticipation) {
+            await participations.set(participation.index, participation);
+          } else {
+            await participations.add(participation);
+          }
+
+          if (dbParticipation) {
+            dbParticipation.calculatedRewards = participation.calculatedRewards;
+            dbParticipation.collectedRewards = participation.collectedRewards;
+            dbParticipation.isRecalled = participation.isRecalled;
+          } else {
+            await orm.em.persist(
+              new Participations(profile.address, participation)
+            );
+          }
+          await orm.em.flush();
+
+          console.log("Participation saved", participation.address);
+        } catch (e) {
+          console.error(e, "Error while saving participation", participation);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    "processed",
+    [
+      {
+        dataSize: missionsProgram.account.participation.size,
+      },
+      {
+        memcmp: missionsCoder.memcmp("participation"),
       },
     ]
   );

@@ -7,20 +7,30 @@ const getProfile: Handler = (req: Request, res) => {
   const response = new ResponseHelper(res);
 
   return req.orm?.em
-    .findOne(Profile, {
+    .find(Profile, {
       $or: [
         {
-          address: req.params.identity,
+          address: {
+            $like: `%${req.params.identity}%`,
+          },
         },
         {
-          userAddress: req.params.identity,
+          userAddress: {
+            $like: `%${req.params.identity}%`,
+          },
+        },
+        {
+          identity: {
+            $like: `%${req.params.identity}%`,
+          },
         },
       ],
     })
-    .then((profile) => {
-      if (!profile) return response.notFound();
-      const profileNew = profile.toJSON();
-      return response.ok(undefined, profileNew);
+    .then((profiles) => {
+      return response.ok(
+        undefined,
+        profiles.map((p) => p.toJSON())
+      );
     })
     .catch((e) => response.error(e.message));
 };
