@@ -1,13 +1,13 @@
-import * as web3 from "@solana/web3.js";
-import * as anchor from "@project-serum/anchor";
-import fs from "fs";
-import dotenv from "dotenv";
-import { Project, Missions, MissionsIDL } from "./types";
 import {
   Honeycomb,
   HoneycombProject,
   identityModule,
 } from "@honeycomb-protocol/hive-control";
+import * as anchor from "@project-serum/anchor";
+import * as web3 from "@solana/web3.js";
+import dotenv from "dotenv";
+import fs from "fs";
+import { Missions, MissionsIDL, Project } from "./types";
 
 dotenv.config();
 
@@ -62,7 +62,7 @@ export async function getHoneycomb(
 export const getMissionsProgram = (honeycomb: Honeycomb) => {
   const provider = new anchor.AnchorProvider(
     new web3.Connection("https://api.metaplex.solana.com") ||
-      honeycomb.connection,
+    honeycomb.connection,
     honeycomb.identity(),
     {
       preflightCommitment: "confirmed",
@@ -82,6 +82,7 @@ export const getMissionsProgram = (honeycomb: Honeycomb) => {
   return {
     missionsCoder: new anchor.BorshAccountsCoder(program.idl),
     missionsProgram: program,
+    missionProject: new web3.PublicKey("9hk4HB85mKJHs2pbx2RpDZGeMjTsKhjknf7ibzFwCvmA"),
     missionsKey: new web3.PublicKey(
       false && honeycomb.cluster === "devnet"
         ? "CWoCehkYMbZmnTxJne8LaQx58J8qDHVYFHyi5nHHwSeF"
