@@ -45,9 +45,8 @@ app.use(
   })
 );
 
-
 (async () => {
-  const honeycomb = await getHoneycomb("devnet");
+  const honeycomb = await getHoneycomb("steam");
   const orm = await connectDB(honeycomb.project().address.toString() + "_db");
   const steam = steamClient();
   app.use((req: Request, _res, next) => {
@@ -57,7 +56,6 @@ app.use(
     next();
   });
   honeycomb.project().profileDataConfig.forEach((config, label) => {
-
     if (config.__kind === "Entity") {
       const capitalizeLabel = label[0].toUpperCase() + label.slice(1);
       //@ts-ignore
