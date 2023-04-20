@@ -58,6 +58,8 @@ app.use(
   const honeycomb = await getHoneycomb("solpatrol");
   const orm = await connectDB(honeycomb.project().address.toString() + "_db");
 
+  console.log("RPC", honeycomb.rpcEndpoint);
+
   app.use((req: Request, _res, next) => {
     req.orm = orm;
     req.honeycomb = honeycomb;
