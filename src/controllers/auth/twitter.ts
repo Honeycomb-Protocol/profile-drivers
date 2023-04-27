@@ -4,16 +4,10 @@ import { Request } from "../../types";
 import Twitter, { OauthToken, OauthTokenSecret } from "twitter-lite";
 import config from "../../config";
 import { ResponseHelper } from "../../utils";
-import { Profile, Wallets } from "../../models";
+import { Profile } from "../../models";
 import { authenticate } from "../../middlewares";
-import {
-  IdentityProfile,
-  getProfilePda,
-} from "@honeycomb-protocol/hive-control";
-import {
-  fetchAndSaveSingleProfileByUserAddress,
-  saveProfile,
-} from "../../sockets";
+import { IdentityProfile } from "@honeycomb-protocol/hive-control";
+import { fetchAndSaveSingleProfileByUserAddress } from "../../sockets";
 
 const router = express.Router();
 

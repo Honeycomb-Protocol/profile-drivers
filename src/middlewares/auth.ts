@@ -30,7 +30,6 @@ export const authenticate: Handler = async (
           authToken: req.headers.authorization.split(" ")[1],
         });
         if (!success) return response.unauthorized(message);
-
         req.session.web3User = user;
         req.user = user;
       } catch (e: any) {
