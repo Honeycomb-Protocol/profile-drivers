@@ -4,6 +4,7 @@ import {
   Honeycomb,
   IdentityProfile,
   Profile as ProfileChain,
+  identityToString,
   profileDiscriminator,
 } from "@honeycomb-protocol/hive-control";
 import { MikroORM } from "@mikro-orm/core";
@@ -22,14 +23,10 @@ export async function saveProfile(
 
   if (!profile) {
     const user = await honeycomb.identity().fetch().user(profileChain.user);
-    let wallet: web3.PublicKey | undefined;
-    if (user.primaryWallet.toString().startsWith(profileChain.identity)) {
-      wallet = user.primaryWallet;
-    } else {
-      wallet = user.secondaryWallets.find((w) =>
-        w.toString().startsWith(profileChain.identity)
-      );
-    }
+    let wallet: web3.PublicKey | undefined =
+      profileChain.identity.__kind === "Wallet"
+        ? profileChain.identity.key
+        : undefined;
     if (!wallet) {
       console.log(
         "No wallet found for profile",
@@ -50,7 +47,7 @@ export async function saveProfile(
       address: profileAddress,
       userAddress: profileChain.user,
       wallet,
-      identity: profileChain.identity,
+      identity: identityToString(profileChain.identity),
       xp: 0,
       level: 0,
       bounty: 0,
@@ -317,7 +314,7 @@ export async function fetchParticipationsFor(
     .profile(
       undefined,
       new web3.PublicKey(profile.userAddress),
-      profile.identity
+      new web3.PublicKey(profile.identity)
     );
 
   const participations = await profileObj.entity<IParticipation>(
@@ -532,7 +529,7 @@ export function startParticipationsSocket(honeycomb: Honeycomb, orm: MikroORM) {
           .profile(
             undefined,
             new web3.PublicKey(profile.userAddress),
-            profile.identity
+            new web3.PublicKey(profile.identity)
           );
 
         const participations = await profileObj.entity<IParticipation>(
