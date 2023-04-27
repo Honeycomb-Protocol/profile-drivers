@@ -6,6 +6,7 @@ import {
   Profile as ProfileChain,
   userDiscriminator,
   profileDiscriminator,
+  identityToString,
 } from "@honeycomb-protocol/hive-control";
 import { MikroORM } from "@mikro-orm/core";
 import { Profile, Wallets } from "../models";
@@ -30,7 +31,7 @@ export async function saveProfile(
   if (!profile) {
     profile = new Profile(profileAddress);
     profile.useraddress = profileChain.user;
-    profile.identity = profileChain.identity;
+    profile.identity = identityToString(profileChain.identity);
     //@ts-ignore
     profile.wallets = Wallets.from({
       primary_wallet: userChain.primaryWallet,
@@ -51,7 +52,7 @@ export async function saveProfile(
     await orm.em.flush();
   } else {
     profile.useraddress = profileChain.user;
-    profile.identity = profileChain.identity;
+    profile.identity = identityToString(profileChain.identity);
     //@ts-ignore
     profile.wallets = Wallets.from({
       primary_wallet: userChain.primaryWallet,
@@ -129,7 +130,7 @@ export async function fetchTweets(
     .profile(
       undefined,
       new web3.PublicKey(profile.useraddress),
-      profile.identity
+      new web3.PublicKey(profile.identity)
     );
   const tweets = profileObj.entity<ITweet>("tweets");
   if (!tweets) return;
