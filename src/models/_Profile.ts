@@ -9,61 +9,14 @@ import {
 } from "@mikro-orm/core";
 import { PublicKey } from "@solana/web3.js";
 
-export interface IWallets {
-  primary_wallet: PublicKey;
-  secondary_wallets: PublicKey[];
-}
-
 export interface IProfile {
   address: PublicKey;
-  useraddress: PublicKey;
-  wallets: IWallets;
+  userAddress: PublicKey;
+  identity: string;
   steamUsername?: string;
   steamId?: string;
 }
 
-export class Wallets implements IWallets {
-  public primary_wallet: PublicKey;
-  public secondary_wallets: PublicKey[];
-
-  constructor(input: string = "{}") {
-    const parsed = Wallets.parse(input);
-    this.primary_wallet = parsed.primary_wallet || PublicKey.default;
-    this.secondary_wallets = parsed.secondary_wallets || [];
-  }
-
-  public toString(): string {
-    return Wallets.stringify(this);
-  }
-
-  public static from(wallets: IWallets) {
-    return new Wallets(Wallets.stringify(wallets));
-  }
-
-  public static parse(input: string) {
-    const parsed = {} as IWallets;
-    parsed.secondary_wallets = [];
-
-    input.split(";").forEach((wallet) => {
-      if (wallet.startsWith("p:")) {
-        parsed.primary_wallet = new PublicKey(wallet.replace("p:", ""));
-      } else {
-        parsed.secondary_wallets.push(new PublicKey(wallet.replace("s:", "")));
-      }
-    });
-    if (!parsed.primary_wallet)
-      throw new Error("Primary wallet not found in input");
-    return parsed;
-  }
-
-  public static stringify(wallets: IWallets) {
-    const stringified = [`p:${wallets.primary_wallet.toString()}`];
-    wallets.secondary_wallets.forEach((wallet) =>
-      stringified.push(`s:${wallet.toString()}`)
-    );
-    return stringified.join(";");
-  }
-}
 
 @Entity()
 export class Profile
@@ -73,10 +26,7 @@ export class Profile
   address!: PublicKey;
 
   @Property()
-  useraddress!: PublicKey
-
-  @Property()
-  wallets!: Wallets;
+  userAddress!: PublicKey
 
   @Property()
   identity!: string;
@@ -93,13 +43,19 @@ export class Profile
   @Property({
     nullable: true,
   })
+  steamImage!: string;
+  @Property({
+    nullable: true,
+  })
   steamLevel!: number;
 
   @OneToMany(() => SteamFriend, (steamFriend) => steamFriend.profile)
   friends = new Collection<SteamFriend>(this);
 
-  constructor(address: PublicKey) {
+  constructor(profile: IProfile) {
     super();
-    this.address = address;
+    this.address = profile.address;
+    this.userAddress = profile.userAddress;
+    this.identity = profile.identity;
   }
 }

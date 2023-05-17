@@ -1,6 +1,6 @@
 import { PopulateHint } from "@mikro-orm/core";
 import express, { Handler } from "express";
-import { Profile, SteamAchievements, SteamFriend, SteamGame, SteamGamePlayerStat, SteamOwnedCollectible, SteamOwnedGames, Wallets } from "../models";
+import { Profile, SteamAchievements, SteamFriend, SteamGame, SteamGamePlayerStat, SteamOwnedCollectible, SteamOwnedGames } from "../models";
 import { Request } from "../types";
 import { ResponseHelper } from "../utils";
 import { authenticate } from "../middlewares";
@@ -15,13 +15,8 @@ const getFriends: Handler = (req: Request, res) => {
       profile: {
         $or: [
           {
-            useraddress: req.user.address,
+            steamId: req.params.steamId,
           },
-          {
-            wallets: {
-              $like: `%${req.user.address}%`
-            }
-          }
         ]
       }
     })
@@ -50,13 +45,8 @@ const getGames: Handler = (req: Request, res) => {
       profile: {
         $or: [
           {
-            useraddress: req.user.address,
+            steamId: req.params.steamId,
           },
-          {
-            wallets: {
-              $like: `%${req.user.address}%`
-            }
-          }
         ]
       }
     }, {
@@ -69,13 +59,9 @@ const getGames: Handler = (req: Request, res) => {
           profile: {
             $or: [
               {
-                useraddress: req.user.address,
+                steamId: req.params.steamId,
               },
-              {
-                wallets: {
-                  $like: `%${req.user.address}%`
-                }
-              }
+
             ]
           }, app_id: games.map((item) => item.app_id)
         }).then((achievements) => {
@@ -83,13 +69,8 @@ const getGames: Handler = (req: Request, res) => {
             profile: {
               $or: [
                 {
-                  useraddress: req.user.address,
+                  steamId: req.params.steamId,
                 },
-                {
-                  wallets: {
-                    $like: `%${req.user.address}%`
-                  }
-                }
               ]
             }, app_id: games.map((item) => item.app_id)
           }).then((gameStats) => {
@@ -119,13 +100,9 @@ const getCollectibles: Handler = (req: Request, res) => {
       profile: {
         $or: [
           {
-            useraddress: req.user.address,
+            steamId: req.params.steamId,
           },
-          {
-            wallets: {
-              $like: `%${req.user.address}%`
-            }
-          }
+
         ]
       }
     }, {
@@ -173,13 +150,9 @@ const getGamesAchievements: Handler = (req: Request, res) => {
       profile: {
         $or: [
           {
-            useraddress: req.user.address,
+            steamId: req.params.steamId,
           },
-          {
-            wallets: {
-              $like: `%${req.user.address}%`
-            }
-          }
+
         ]
       },
       app_id: parseInt(req.params.gameId)
@@ -198,9 +171,9 @@ const getGamesAchievements: Handler = (req: Request, res) => {
 
 const router = express.Router();
 
-router.get("/friends", authenticate, getFriends);
-router.get("/games", authenticate, getGames);
-router.get("/games/collectibles", authenticate, getCollectibles);
-router.get("/games/achievements/:gameId", authenticate, getGamesAchievements);
+router.get("/friends/:steamId", authenticate, getFriends);
+router.get("/games/:steamId", authenticate, getGames);
+router.get("/games/collectibles/:steamId", authenticate, getCollectibles);
+router.get("/games/achievements/:steamId/:gameId", authenticate, getGamesAchievements);
 
 export default router;

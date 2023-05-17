@@ -34,7 +34,6 @@ export async function getHoneycomb(
 ) {
   const project: Project = projects[projectName];
   if (!project) throw new Error("Project not found");
-
   const RPC = project.rpc || config.rpc_url;
 
   if (!opts) {

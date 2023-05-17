@@ -1,5 +1,5 @@
 import express, { Handler } from "express";
-import { Profile, Wallets } from "../models";
+import { Profile } from "../models";
 import { Request } from "../types";
 import { ResponseHelper } from "../utils";
 
@@ -7,27 +7,30 @@ const getProfile: Handler = (req: Request, res) => {
   const response = new ResponseHelper(res);
 
   return req.orm?.em
-    .findOne(Profile, {
+    .find(Profile, {
       $or: [
         {
-          address: req.params.identity,
+          address: {
+            $like: `%${req.params.identity}%`,
+          },
         },
         {
-          useraddress: req.params.identity,
+          userAddress: {
+            $like: `%${req.params.identity}%`,
+          },
         },
         {
-          wallets: {
+          identity: {
             $like: `%${req.params.identity}%`,
           },
         },
       ],
     })
-    .then((profile) => {
-      if (!profile) return response.notFound();
-      const profileNew = profile.toJSON();
-      //@ts-ignore
-      profileNew.wallets = Wallets.parse(profile.wallets);
-      return response.ok(undefined, profileNew);
+    .then((profiles) => {
+      return response.ok(
+        undefined,
+        profiles.map((p) => p.toJSON())
+      );
     })
     .catch((e) => response.error(e.message));
 };
@@ -42,8 +45,6 @@ const getProfiles: Handler = (req: Request, res) => {
         undefined,
         profiles.map((p) => {
           const profile = p.toJSON();
-          //@ts-ignore
-          profile.wallets = Wallets.parse(profile.wallets);
           return profile;
         })
       )

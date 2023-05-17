@@ -7,17 +7,20 @@ import {
   Profile as ProfileChain,
   userDiscriminator,
   profileDiscriminator,
+  identityToString,
+  IdentityProfileEntity,
 } from "@honeycomb-protocol/hive-control";
 const puppeteer = require('puppeteer');
 
 import config from '../config'
 import { MikroORM } from "@mikro-orm/core";
-import { ISteamFriend, ISteamGame, ISteamGameCollectible, Profile, SteamFriend, SteamGame, SteamOwnedCollectible, SteamOwnedGames, Wallets } from "../models";
+import { ISteamFriend, ISteamGameCollectible, Profile, SteamFriend, SteamGame, SteamOwnedCollectible, SteamOwnedGames } from "../models";
 import axios from "axios";
 import { ISteamUser, SteamUser } from "../models/SteamUser";
 import { SteamAssetClassInfo } from '../models/SteamAssetClassInfo';
 import { ISteamGamePlayerStat, SteamGamePlayerStat } from '../models/SteamGamePlayerStat';
 import { ISteamAchievements, SteamAchievements } from '../models/SteamAchievements';
+import { ProvableEntity } from '../types/ProvableEntity';
 const testingUser = null;
 
 interface ISteamOwnedGamesApi {
@@ -80,6 +83,52 @@ interface ISteamPlayerAchievementsApi {
   "achievements": { apiname: string, achieved: number, unlocktime: number }[],
 }
 
+export async function deleteProfile(
+  honeycomb: Honeycomb,
+  orm: MikroORM,
+  profileAddress: web3.PublicKey,
+  profileChain: ProfileChain,
+) {
+  try {
+    let profile = await orm.em.findOne(Profile, {
+      address: profileAddress,
+    });
+
+    if (!profile) return;
+
+    const identityProfile = honeycomb.identity().register(profileChain);
+
+    for (let [key, value] of identityProfile.data) {
+      if (value instanceof IdentityProfileEntity) {
+
+        const tree = identityProfile.entity<any>(key);
+        tree.setLeaves(
+          await orm.em
+            .find(
+              SteamFriend,
+              {
+                profile: {
+                  address: profile.address,
+                },
+              },
+              {
+                orderBy: {
+                  index: 1,
+                },
+              }
+            )
+            .then((rows) => rows.map((row: any) => row.toJSON() as any))
+        );
+
+        console.log("tree", tree.values)
+
+      }
+    }
+
+    return profile;
+  } catch (e) { console.error(e) }
+}
+
 export async function saveProfile(
   honeycomb: Honeycomb,
   orm: MikroORM,
@@ -87,41 +136,54 @@ export async function saveProfile(
   profileChain: ProfileChain,
   doNotFetchData: boolean = false
 ) {
-  let profile = await orm.em.findOne(Profile, {
-    address: profileAddress,
-  });
+  try {
+    let profile = await orm.em.findOne(Profile, {
+      address: profileAddress,
+    });
 
-  if (!profile) {
-    const userChain = await UserChain.fromAccountAddress(
-      honeycomb.processedConnection,
-      profileChain.user
-    );
+    if (!profile) {
+      let steamId: string | undefined =
+        profileChain.identity.__kind === "Value"
+          ? profileChain.identity.value
+          : undefined;
+      console.log("wallet", steamId, profileChain.identity.__kind, profileChain.identity)
+      if (!steamId) {
 
-    profile = new Profile(profileAddress);
-    profile.identity = profileChain.identity;
-    profile.useraddress = profileChain.user;
-    //@ts-ignore
-    profile.wallets = Wallets.from({
-      primary_wallet: userChain.primaryWallet,
-      secondary_wallets: userChain.secondaryWallets,
-    }).toString();
+        return;
+      }
 
-    orm.em.persist(profile);
-  }
+      profile = new Profile({
+        address: profileAddress,
+        userAddress: profileChain.user,
+        identity: identityToString(profileChain.identity),
+      });
+      orm.em.persist(profile);
 
-  const steamId = profileChain.data.get("steamId");
-  if (steamId && steamId.__kind == "SingleValue") {
-    profile.steamId = steamId.value;
-  }
+    }
 
-  const steamUsername = profileChain.data.get("steamUsername");
-  if (steamUsername && steamUsername.__kind == "SingleValue") {
-    profile.steamUsername = steamUsername.value;
-  }
+    const steamId = profileChain.data.get("steamId");
+    console.log("steamId", steamId)
+    if (steamId && steamId.__kind == "SingleValue") {
+      profile.steamId = steamId.value;
+    }
 
-  await orm.em.flush();
-  if(!doNotFetchData) await fetchAllEntitiesFor(honeycomb, orm, profile);
-  return profile;
+    const steamUsername = profileChain.data.get("steamUsername");
+    if (steamUsername && steamUsername.__kind == "SingleValue") {
+      profile.steamUsername = steamUsername.value;
+    }
+    const steamLevel = profileChain.data.get("steamLevel");
+    if (steamLevel && steamLevel.__kind == "SingleValue") {
+      profile.steamLevel = Number(steamLevel.value);
+    }
+    const steamImage = profileChain.data.get("steamImage");
+    if (steamImage && steamImage.__kind == "SingleValue") {
+      profile.steamImage = steamImage.value;
+    }
+
+    await orm.em.flush();
+    if (!doNotFetchData) await fetchAllEntitiesFor(honeycomb, orm, profile);
+    return profile;
+  } catch (e) { console.error(e) }
 }
 
 export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
@@ -134,6 +196,12 @@ export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
       return Promise.all(
         profilesChain.map(async (profileChain) => {
           try {
+            // await deleteProfile(
+            //   honeycomb,
+            //   orm,
+            //   profileChain.pubkey,
+            //   ProfileChain.fromAccountInfo(profileChain.account)[0]
+            // );
             await saveProfile(
               honeycomb,
               orm,
@@ -141,7 +209,7 @@ export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
               ProfileChain.fromAccountInfo(profileChain.account)[0]
             );
           } catch (e) {
-            console.error(e);
+            console.error("error", e);
           }
         })
       );
@@ -149,18 +217,18 @@ export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
 }
 export async function fetchAndSaveSingleProfileByUserAddress(honeycomb: Honeycomb, userAddress: web3.PublicKey, orm: MikroORM) {
   console.log("Refreshing Profiles...");
-  const [profileChain] =  await ProfileChain.gpaBuilder()
+  const [profileChain] = await ProfileChain.gpaBuilder()
     .addFilter("project", honeycomb.project().address)
     .addFilter("user", userAddress)
     .run(honeycomb.connection);
-    if (!profileChain) return null;
-    return await saveProfile(
-      honeycomb,
-      orm,
-      profileChain.pubkey,
-      ProfileChain.fromAccountInfo(profileChain.account)[0],
-      true
-    );
+  if (!profileChain) return null;
+  return await saveProfile(
+    honeycomb,
+    orm,
+    profileChain.pubkey,
+    ProfileChain.fromAccountInfo(profileChain.account)[0],
+    true
+  );
 }
 
 const waiting = (ms = 1000): Promise<boolean> => {
@@ -179,69 +247,74 @@ export async function fetchFriendList(
   const profileObj = await honeycomb
     .identity()
     .fetch()
-    .profile(undefined, new web3.PublicKey(profile.useraddress), profile.identity);
-  const tree = profileObj.entity<ISteamFriend>("SteamFriend");
-  tree.setLeaves(
-    await orm.em
-      .find(
-        SteamFriend,
-        {
-          profile: {
-            address: profile.address,
+    .profile(undefined, new web3.PublicKey(profile.userAddress), profile.identity);
+  try {
+    const tree = profileObj.entity<ISteamFriend>("SteamFriend");
+    tree.setLeaves(
+      await orm.em
+        .find(
+          SteamFriend,
+          {
+            profile: {
+              address: profile.address,
+            },
           },
-        },
-        {
-          orderBy: {
-            index: 1,
-          },
-        }
-      )
-      .then((rows) => rows.map((row) => row.toJSON() as ISteamFriend))
-  );
+          {
+            orderBy: {
+              index: 1,
+            },
+          }
+        )
+        .then((rows) => rows.map((row) => row.toJSON() as ISteamFriend))
+    );
 
-  const steamId = profileObj.get("steamId");
+    const steamId = profileObj.get("steamId");
+    // const steamId = profile.identity;
 
-  if (!steamId) return;
-  const url = `https://api.steampowered.com/ISteamUser/GetFriendList/v0001/?key=${config.steam_api_key}&steamid=${testingUser || profile.steamId}&relationship=friend`
-  const friendList = await honeycomb.http().get(url).then(res => {
-    return (res.friendslist?.friends || []) as {
-      "steamid": string,
-      "relationship": string,
-      "friend_since": number
-    }[]
-  })
-  console.log(friendList)
-  for (let friend of friendList) {
-    let dataInDb = await orm.em.findOne(SteamFriend, {
-      profile,
-      steamId: friend.steamid,
-    });
-    const leave = tree.values.find((t) => t.steamId == friend.steamid);
-    let index = tree.values.length;
-    let add;
-    if (dataInDb) {
-      if (leave) continue;
-    } else {
-      add = true;
-      dataInDb = new SteamFriend(
-        [profile.address, index],
-        friend.steamid,
-        friend.relationship,
-        friend.friend_since,
-      );
-    }
-    try {
-      if (leave) {
+    if (!steamId) return;
+    const url = `https://api.steampowered.com/ISteamUser/GetFriendList/v0001/?key=${config.steam_api_key}&steamid=${testingUser || profile.steamId || profile.identity}&relationship=friend`
+    const friendList = await honeycomb.http().get(url).then(res => {
+      return (res.friendslist?.friends || []) as {
+        "steamid": string,
+        "relationship": string,
+        "friend_since": number
+      }[]
+    })
+    console.log(friendList)
+    for (let friend of friendList) {
+      let dataInDb = await orm.em.findOne(SteamFriend, {
+        profile,
+        steamId: friend.steamid,
+      });
+      const leave = tree.values.find((t) => t.steamId == friend.steamid);
+      let index = tree.values.length;
+      let add;
+      if (dataInDb) {
+        if (leave) continue;
       } else {
-        await tree.add(dataInDb.toJSON() as any);
+        add = true;
+        dataInDb = new SteamFriend(
+          [profile.address, index],
+          friend.steamid,
+          friend.relationship,
+          friend.friend_since,
+        );
       }
-      if (add) orm.em.persist(dataInDb);
-    } catch (e) {
-      console.error(e);
+      try {
+        if (leave) {
+        } else {
+          await tree.add(dataInDb.toJSON() as any);
+        }
+        if (add) orm.em.persist(dataInDb);
+      } catch (e) {
+        console.error(e);
+      }
+      await waiting(1000)
     }
-    await waiting(1000)
+    return orm.em.flush();
+  } catch (e) {
+    console.error(e)
   }
-  return orm.em.flush();
 }
 export async function fetchCollectible(
   honeycomb: Honeycomb,
@@ -250,115 +323,121 @@ export async function fetchCollectible(
   game: SteamOwnedGames,
 ) {
   //@ts-ignore
-  const profileObj = await honeycomb
-    .identity()
-    .fetch()
-    .profile(undefined, new web3.PublicKey(profile.useraddress), profile.identity);
-  const tree = profileObj.entity<ISteamGameCollectible>("SteamOwnedCollectible");
-  tree.setLeaves(
-    await orm.em
-      .find(
-        SteamOwnedCollectible,
-        {
-          profile: {
-            address: profile.address,
+  try {
+
+
+    const profileObj = await honeycomb
+      .identity()
+      .fetch()
+      .profile(undefined, new web3.PublicKey(profile.userAddress), profile.identity);
+    const tree = profileObj.entity<ISteamGameCollectible>("SteamOwnedCollectible");
+    tree.setLeaves(
+      await orm.em
+        .find(
+          SteamOwnedCollectible,
+          {
+            profile: {
+              address: profile.address,
+            },
           },
-        },
-        {
-          orderBy: {
-            index: 1,
-          },
-        }
-      )
-      .then((rows) => rows.map((row) => row.toJSON() as SteamOwnedCollectible))
-  );
+          {
+            orderBy: {
+              index: 1,
+            },
+          }
+        )
+        .then((rows) => rows.map((row) => row.toJSON() as SteamOwnedCollectible))
+    );
 
-  const steamId = profileObj.get("steamId");
+    const steamId = profileObj.get("steamId");
 
-  if (!steamId) return;
+    if (!steamId) return;
 
-  console.log("launching puppeteer")
+    console.log("launching puppeteer")
 
-  const options = {
-    product: "chrome",
-    dumpio: true,
-    ignoreHTTPSErrors: true,
+    const options = {
+      product: "chrome",
+      dumpio: true,
+      ignoreHTTPSErrors: true,
 
-  };
+    };
 
-  const browser = await puppeteer.launch(options);
-  const page = await browser.newPage();
-  const url = `https://steamcommunity.com/inventory/${testingUser || profile.steamId}/${game.app_id || 730}/2?l=english&key=${config.steam_api_key || ""}`
-  // Navigate to the Steam Community page you want to scrape
-  await page.goto(url, { waitUntil: 'networkidle2' });
+    const browser = await puppeteer.launch(options);
+    const page = await browser.newPage();
+    const url = `https://steamcommunity.com/inventory/${testingUser || profile.steamId || profile.identity}/${game.app_id || 730}/2?l=english&key=${config.steam_api_key || ""}`
+    // Navigate to the Steam Community page you want to scrape
+    await page.goto(url, { waitUntil: 'networkidle2' });
 
 
-  await page.content();
+    await page.content();
 
-  let innerText = await page.evaluate(() => {
-    console.log("iner", document.querySelector("body"))
-    return JSON.parse(document.querySelector("body")!.innerText);
-  });
-
-  console.log(innerText, url);
-  if (!innerText?.assets) return;
-
-  await browser.close();
-
-  // const collectibleList = await honeycomb.http().get(url).then(res => (res.data.assets || []) as {
-  //   "appid": number,
-  //   "contextid": string,
-  //   "assetid": string,
-  //   "classid": string,
-  //   "instanceid": string,
-  //   "amount": string
-  // }[]).catch(e => {
-  //   console.log({ e })
-  //   if (game.app_id == 730) console.log("err", e.response.statusText)
-  //   return [];
-  // })
-  // console.log({ collectibleList }, url, game.app_id)
-  for (let collect of innerText.assets as {
-    "appid": number,
-    "contextid": string,
-    "assetid": string,
-    "classid": string,
-    "instanceid": string,
-    "amount": string
-  }[]) {
-    let dataInDb = await orm.em.findOne(SteamOwnedCollectible, {
-      profile,
-      app_id: collect.appid,
+    let innerText = await page.evaluate(() => {
+      console.log("iner", document.querySelector("body"))
+      return JSON.parse(document.querySelector("body")!.innerText);
     });
-    const leave = tree.values.find((t) => t.app_id == collect.appid);
-    let index = tree.values.length;
-    let add;
-    if (dataInDb) {
-      if (leave) continue;
-    } else {
-      add = true;
-      dataInDb = new SteamOwnedCollectible(
-        [profile.address, index],
-        collect.appid,
-        collect.assetid,
-        collect.classid,
-        collect.amount,
-      );
-    }
-    try {
-      if (leave) {
+
+    console.log(innerText, url);
+    if (!innerText?.assets) return;
+
+    await browser.close();
+
+    // const collectibleList = await honeycomb.http().get(url).then(res => (res.data.assets || []) as {
+    //   "appid": number,
+    //   "contextid": string,
+    //   "assetid": string,
+    //   "classid": string,
+    //   "instanceid": string,
+    //   "amount": string
+    // }[]).catch(e => {
+    //   console.log({ e })
+    //   if (game.app_id == 730) console.log("err", e.response.statusText)
+    //   return [];
+    // })
+    // console.log({ collectibleList }, url, game.app_id)
+    for (let collect of innerText.assets as {
+      "appid": number,
+      "contextid": string,
+      "assetid": string,
+      "classid": string,
+      "instanceid": string,
+      "amount": string
+    }[]) {
+      let dataInDb = await orm.em.findOne(SteamOwnedCollectible, {
+        profile,
+        app_id: collect.appid,
+      });
+      const leave = tree.values.find((t) => t.app_id == collect.appid);
+      let index = tree.values.length;
+      let add;
+      if (dataInDb) {
+        if (leave) continue;
       } else {
-        await tree.add(dataInDb.toJSON() as any);
+        add = true;
+        dataInDb = new SteamOwnedCollectible(
+          [profile.address, index],
+          collect.appid,
+          collect.assetid,
+          collect.classid,
+          collect.amount,
+        );
       }
-      if (add) orm.em.persist(dataInDb);
-    } catch (e) {
-      console.error(e);
+      try {
+        if (leave) {
+        } else {
+          await tree.add(dataInDb.toJSON() as any);
+        }
+        if (add) orm.em.persist(dataInDb);
+      } catch (e) {
+        console.error(e);
+      }
     }
+    await waiting(1000)
+
+
+    return orm.em.flush();
+  } catch (e) {
+    console.error(e)
   }
-  await waiting(1000)
-
-
-  return orm.em.flush();
 }
 
 export async function fetchGamePlayerStats(
@@ -367,89 +446,92 @@ export async function fetchGamePlayerStats(
   profile: Profile,
   game: SteamOwnedGames,
 ) {
-  //@ts-ignore
-  const { primary_wallet } = Wallets.parse(profile.wallets);
-  const profileObj = await honeycomb
-    .identity()
-    .fetch()
-    .profile(undefined, new web3.PublicKey(profile.useraddress), profile.identity);
-  const stats = profileObj.entity<ISteamGamePlayerStat>("SteamGamePlayerStat");
-  stats.setLeaves(
-    await orm.em
-      .find(
-        SteamGamePlayerStat,
-        {
-          profile: {
-            address: profile.address,
+  try {
+    //@ts-ignore
+    const profileObj = await honeycomb
+      .identity()
+      .fetch()
+      .profile(undefined, new web3.PublicKey(profile.userAddress), profile.identity);
+    const stats = profileObj.entity<ISteamGamePlayerStat>("SteamGamePlayerStat");
+    stats.setLeaves(
+      await orm.em
+        .find(
+          SteamGamePlayerStat,
+          {
+            profile: {
+              address: profile.address,
+            },
+            app_id: game.app_id,
           },
-          app_id: game.app_id,
-        },
-        {
-          orderBy: {
-            index: 1,
-          },
-        }
-      )
-      .then((stats) => stats.map((t) => t.toJSON()))
-  );
+          {
+            orderBy: {
+              index: 1,
+            },
+          }
+        )
+        .then((stats) => stats.map((t) => t.toJSON()))
+    );
 
-  const steamId = profileObj.get("steamId");
-  if (!steamId) return;
+    const steamId = profileObj.get("steamId");
+    if (!steamId) return;
 
 
-  const url = `https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/?appid=${game.app_id}&key=${config.steam_api_key}&steamid=${profile.steamId}`
-  const gamePlayerStat = await honeycomb.http().get(url).then(res => (res?.playerstats) as ISteamGamePlayerStatApi).catch(e => {
-    console.error({ e })
-    return;
-  })
-  if (!gamePlayerStat) return;
+    const url = `https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/?appid=${game.app_id}&key=${config.steam_api_key}&steamid=${profile.steamId}`
+    const gamePlayerStat = await honeycomb.http().get(url).then(res => (res?.playerstats) as ISteamGamePlayerStatApi).catch(e => {
+      console.error({ e })
+      return;
+    })
+    if (!gamePlayerStat) return;
 
-  for (let statRaw of gamePlayerStat.stats) {
-    const dbStat = await orm.em.findOne(SteamGamePlayerStat, {
-      profile: { address: profile.address },
-      name: statRaw.name,
-      app_id: game.app_id
-    });
-    const storedStat = stats.values.find((t) => t.name == statRaw.name && t.app_id == game.app_id);
-    let index = stats.values.length;
+    for (let statRaw of gamePlayerStat.stats) {
+      const dbStat = await orm.em.findOne(SteamGamePlayerStat, {
+        profile: { address: profile.address },
+        name: statRaw.name,
+        app_id: game.app_id
+      });
+      const storedStat = stats.values.find((t) => t.name == statRaw.name && t.app_id == game.app_id);
+      let index = stats.values.length;
 
-    try {
-      if (storedStat) {
-        index = storedStat.index;
-        if (storedStat.value != statRaw.value) {
-          await stats.set(index, {
+      try {
+        if (storedStat) {
+          index = storedStat.index;
+          if (storedStat.value != statRaw.value) {
+            await stats.set(index, {
+              index,
+              name: statRaw.name,
+              value: statRaw.value,
+              app_id: game.app_id
+            });
+          }
+        } else {
+          await stats.add({
             index,
             name: statRaw.name,
             value: statRaw.value,
             app_id: game.app_id
           });
         }
-      } else {
-        await stats.add({
-          index,
-          name: statRaw.name,
-          value: statRaw.value,
-          app_id: game.app_id
-        });
-      }
 
-      if (dbStat) {
-        dbStat.value = statRaw.value;
-      } else {
-        const newStat = new SteamGamePlayerStat(
-          [profile.address, index],
-          statRaw.name,
-          statRaw.value,
-          game.app_id
-        );
-        orm.em.persist(newStat);
+        if (dbStat) {
+          dbStat.value = statRaw.value;
+        } else {
+          const newStat = new SteamGamePlayerStat(
+            [profile.address, index],
+            statRaw.name,
+            statRaw.value,
+            game.app_id
+          );
+          orm.em.persist(newStat);
+        }
+      } catch (e) {
+        console.error(e);
       }
-    } catch (e) {
-      console.error(e);
     }
-  }
 
-  return orm.em.flush();
+    return orm.em.flush();
+  } catch (e) {
+    console.error(e)
+  }
 }
 export async function fetchGameAchievements(
   honeycomb: Honeycomb,
@@ -457,57 +539,68 @@ export async function fetchGameAchievements(
   profile: Profile,
   game: SteamOwnedGames,
 ) {
-  //@ts-ignore
-  const { primary_wallet } = Wallets.parse(profile.wallets);
-  const profileObj = await honeycomb
-    .identity()
-    .fetch()
-    .profile(undefined, new web3.PublicKey(profile.useraddress), profile.identity);
-  const achievements = profileObj.entity<ISteamAchievements>("SteamAchievements");
-  achievements.setLeaves(
-    await orm.em
-      .find(
-        SteamAchievements,
-        {
-          profile: {
-            address: profile.address,
+  try {
+
+
+    //@ts-ignore
+    const profileObj = await honeycomb
+      .identity()
+      .fetch()
+      .profile(undefined, new web3.PublicKey(profile.userAddress), profile.identity);
+    const achievements = profileObj.entity<ISteamAchievements>("SteamAchievements");
+    achievements.setLeaves(
+      await orm.em
+        .find(
+          SteamAchievements,
+          {
+            profile: {
+              address: profile.address,
+            },
+            app_id: game.app_id,
           },
-          app_id: game.app_id,
-        },
-        {
-          orderBy: {
-            index: 1,
-          },
-        }
-      )
-      .then((achievements) => achievements.map((t) => t.toJSON()))
-  );
+          {
+            orderBy: {
+              index: 1,
+            },
+          }
+        )
+        .then((achievements) => achievements.map((t) => t.toJSON()))
+    );
 
-  const steamId = profileObj.get("steamId");
-  if (!steamId) return;
+    const steamId = profileObj.get("steamId");
+    if (!steamId) return;
 
 
-  const url = `https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${game.app_id}&key=${config.steam_api_key}&steamid=${profile.steamId}`
-  const gamePlayerStat = await honeycomb.http().get(url).then(res => (res?.playerstats) as ISteamPlayerAchievementsApi).catch(e => {
-    console.error({ e })
-    return;
-  })
-  if (!gamePlayerStat) return;
+    const url = `https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${game.app_id}&key=${config.steam_api_key}&steamid=${profile.steamId}`
+    const gamePlayerStat = await honeycomb.http().get(url).then(res => (res?.playerstats) as ISteamPlayerAchievementsApi).catch(e => {
+      console.error({ e })
+      return;
+    })
+    if (!gamePlayerStat) return;
 
-  for (let achievementRow of gamePlayerStat.achievements) {
-    const dbStat = await orm.em.findOne(SteamAchievements, {
-      profile: { address: profile.address },
-      name: achievementRow.apiname,
-      app_id: game.app_id
-    });
-    const storedAchievement = achievements.values.find((t) => t.name == achievementRow.apiname && t.app_id == game.app_id);
-    let index = achievements.values.length;
+    for (let achievementRow of gamePlayerStat.achievements) {
+      const dbStat = await orm.em.findOne(SteamAchievements, {
+        profile: { address: profile.address },
+        name: achievementRow.apiname,
+        app_id: game.app_id
+      });
+      const storedAchievement = achievements.values.find((t) => t.name == achievementRow.apiname && t.app_id == game.app_id);
+      let index = achievements.values.length;
 
-    try {
-      if (storedAchievement) {
-        index = storedAchievement.index;
-        if (storedAchievement.achieved != achievementRow.achieved) {
-          await achievements.set(index, {
+      try {
+        if (storedAchievement) {
+          index = storedAchievement.index;
+          if (storedAchievement.achieved != achievementRow.achieved) {
+            await achievements.set(index, {
+              index,
+              name: achievementRow.apiname,
+              achieved: achievementRow.achieved,
+              app_id: game.app_id,
+              unlockTime: achievementRow.unlocktime
+            });
+          }
+        } else {
+          await achievements.add({
             index,
             name: achievementRow.apiname,
             achieved: achievementRow.achieved,
@@ -515,34 +608,28 @@ export async function fetchGameAchievements(
             unlockTime: achievementRow.unlocktime
           });
         }
-      } else {
-        await achievements.add({
-          index,
-          name: achievementRow.apiname,
-          achieved: achievementRow.achieved,
-          app_id: game.app_id,
-          unlockTime: achievementRow.unlocktime
-        });
-      }
 
-      if (dbStat) {
-        dbStat.achieved = achievementRow.achieved;
-      } else {
-        const newAchievement = new SteamAchievements(
-          [profile.address, index],
-          achievementRow.apiname,
-          achievementRow.achieved,
-          game.app_id,
-          achievementRow.unlocktime
-        );
-        orm.em.persist(newAchievement);
+        if (dbStat) {
+          dbStat.achieved = achievementRow.achieved;
+        } else {
+          const newAchievement = new SteamAchievements(
+            [profile.address, index],
+            achievementRow.apiname,
+            achievementRow.achieved,
+            game.app_id,
+            achievementRow.unlocktime
+          );
+          orm.em.persist(newAchievement);
+        }
+      } catch (e) {
+        console.error(e);
       }
-    } catch (e) {
-      console.error(e);
     }
-  }
 
-  return orm.em.flush();
+    return orm.em.flush();
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 export async function fetchOwnedGamesDetails(
@@ -550,83 +637,114 @@ export async function fetchOwnedGamesDetails(
   orm: MikroORM,
   profile: Profile,
 ) {
-  //@ts-ignore
-  const { primary_wallet } = Wallets.parse(profile.wallets);
-  const profileObj = await honeycomb
-    .identity()
-    .fetch()
-    .profile(undefined, new web3.PublicKey(profile.useraddress), profile.identity);
-  const tree = profileObj.entity<ISteamOwnedGames>("SteamOwnedGames");
-  tree.setLeaves(
-    await orm.em
-      .find(
-        SteamOwnedGames,
-        {
-          profile: {
-            address: profile.address,
+  try {
+    //@ts-ignore
+    const profileObj = await honeycomb
+      .identity()
+      .fetch()
+      .profile(undefined, new web3.PublicKey(profile.userAddress), profile.identity);
+    const tree = profileObj.entity<ISteamOwnedGames>("SteamOwnedGames");
+    tree.setLeaves(
+      await orm.em
+        .find(
+          SteamOwnedGames,
+          {
+            profile: {
+              address: profile.address,
+            },
           },
-        },
-        {
-          orderBy: {
-            index: 1,
-          },
-        }
-      )
-      .then((rows) => rows.map((row) => row.toJSON() as ISteamOwnedGames))
-  );
+          {
+            orderBy: {
+              index: 1,
+            },
+          }
+        )
+        .then((rows) => rows.map((row) => row.toJSON() as ISteamOwnedGames))
+    );
 
-  const steamId = profileObj.get("steamId");
-
-  if (!steamId) return;
-  const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${config.steam_api_key}&steamid=${testingUser || profile.steamId}&format=json&include_appinfo=1&include_played_free_games=1`
-  const ownedGameList = await axios.get(url).then(res => (res.data.response?.games || []) as ISteamOwnedGamesApi[])
-  console.log("ownedGameList")
-  for (let ownGame of ownedGameList) {
-    await orm.em.upsert(SteamGame, {
-      app_id:
-        ownGame.appid,
-      gameImage: ownGame.img_icon_url,
-      gameName: ownGame.name,
-    });
-    let dataInDb = await orm.em.findOne(SteamOwnedGames, {
-      profile,
-      app_id: ownGame.appid,
-    });
-    const leave = tree.values.find((t) => t.app_id == ownGame.appid);
-    let index = tree.values.length;
-    let add;
-
-    if (dataInDb) {
-      if (leave) continue;
-    } else {
-      add = true;
-      dataInDb = new SteamOwnedGames(
-        [profile.address, index],
-        ownGame.appid,
-        ownGame.playtime_forever,
-        ownGame.rtime_last_played,
-        ownGame.playtime_windows_forever,
-        ownGame.playtime_mac_forever,
-        ownGame.playtime_linux_forever,
-      );
-    }
-    try {
-      if (leave) {
-        index = leave.index;
+    const steamId = profileObj.get("steamId");
+    console.log("steamID", steamId)
+    if (!steamId) return;
+    const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${config.steam_api_key}&steamid=${testingUser || profile.steamId || profile.identity}&format=json&include_appinfo=1&include_played_free_games=1`
+    const ownedGameList = await axios.get(url).then(res => (res.data.response?.games || []) as ISteamOwnedGamesApi[])
+    // const ownedGameList = [{
+    //   "appid": 730,
+    //   "name": "Counter-Strike: Global Offensive",
+    //   "playtime_forever": 0,
+    //   "playtime_mac_forever": 0,
+    //   "playtime_windows_forever": 0,
+    //   "playtime_linux_forever": 0,
+    //   "img_icon_url": "69c2750e5d9d28db8a1e7d8fdcbfbe4ebe9c6ed3",
+    //   "rtime_last_played": 0
+    // }, {
+    //   "appid": 731,
+    //   "name": "Counter-Strike: Global Offensive1",
+    //   "playtime_forever": 0,
+    //   "playtime_mac_forever": 0,
+    //   "playtime_windows_forever": 0,
+    //   "playtime_linux_forever": 0,
+    //   "img_icon_url": "69c2750e5d9d28db8a1e7d8fdcbfbe4ebe9c6ed3",
+    //   "rtime_last_played": 0
+    // }, {
+    //   "appid": 732,
+    //   "name": "Counter-Strike: Global Offensive2",
+    //   "playtime_forever": 0,
+    //   "playtime_mac_forever": 0,
+    //   "playtime_windows_forever": 0,
+    //   "playtime_linux_forever": 0,
+    //   "img_icon_url": "69c2750e5d9d28db8a1e7d8fdcbfbe4ebe9c6ed3",
+    //   "rtime_last_played": 0
+    // }] as ISteamOwnedGamesApi[]
+    console.log("ownedGameList")
+    for (let ownGame of ownedGameList) {
+      await orm.em.upsert(SteamGame, {
+        app_id:
+          ownGame.appid,
+        gameImage: ownGame.img_icon_url,
+        gameName: ownGame.name,
+      });
+      let dataInDb = await orm.em.findOne(SteamOwnedGames, {
+        profile,
+        app_id: ownGame.appid,
+      });
+      console.log("dataInDb", dataInDb, ownGame.appid)
+      const leave = tree.values.find((t) => t.app_id == ownGame.appid);
+      let index = tree.values.length;
+      let add;
+      if (dataInDb) {
+        if (leave) continue;
       } else {
-        await tree.add(dataInDb.toJSON() as any);
+        add = true;
+        dataInDb = new SteamOwnedGames(
+          [profile.address, index],
+          ownGame.appid,
+          ownGame.playtime_forever,
+          ownGame.rtime_last_played,
+          ownGame.playtime_windows_forever,
+          ownGame.playtime_mac_forever,
+          ownGame.playtime_linux_forever,
+        );
       }
-      if (add) {
-        orm.em.persist(dataInDb);
+      try {
+        if (leave) {
+          index = leave.index;
+        } else {
+          await tree.add(dataInDb.toJSON() as any);
+        }
+        if (add) {
+          orm.em.persist(dataInDb);
 
-      };
-    } catch (e) {
-      console.error(e);
+        };
+      } catch (e) {
+        console.error(e);
+      }
     }
-  }
-  await waiting(2000)
+    await waiting(2000)
 
-  return orm.em.flush();
+    return orm.em.flush();
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 export async function ensureSteamUsersInDb(
@@ -796,6 +914,7 @@ export async function refreshData(
   honeycomb: Honeycomb,
   orm: MikroORM
 ) {
+  console.log("refreshing profiles")
   await fetchProfiles(honeycomb, orm);
   await fetchAllEntitiesForAllUser(honeycomb, orm);
   await ensureSteamUsersInDb(orm);
@@ -819,34 +938,9 @@ export function startSocket(honeycomb: Honeycomb, orm: MikroORM) {
         )[0];
         if (profileChain.project.equals(honeycomb.project().projectAddress)) {
           console.log(`Profile ${account.accountId.toString()} data changed`);
-          await saveProfile(honeycomb, orm, account.accountId, profileChain);
+          await saveProfile(honeycomb, orm, account.accountId, profileChain, true);
         }
-      } catch {
-        try {
-          if (userDiscriminator.join("") !== discriminator.join("")) {
-            throw new Error("Profile Discriminator Mismatch");
-          }
-
-          const userChain = UserChain.fromAccountInfo(account.accountInfo)[0];
-          console.log(`User ${account.accountId.toString()} data changed`);
-
-          const profile = await orm.em.findOne(Profile, {
-            useraddress: account.accountId,
-          });
-
-          if (!!profile) {
-            //@ts-ignore
-            profile.wallets = Wallets.from({
-              primary_wallet: userChain.primaryWallet,
-              secondary_wallets: userChain.secondaryWallets,
-            }).toString();
-
-            await orm.em.flush();
-          }
-        } catch {
-          console.log(`${account.accountId} not matched any discriminator`);
-        }
-      }
+      } catch { }
     }
   );
 }
