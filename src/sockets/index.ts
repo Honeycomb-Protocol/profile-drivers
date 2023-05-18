@@ -120,7 +120,6 @@ export async function deleteProfile(
             .then((rows) => rows.map((row: any) => row.toJSON() as any))
         );
 
-        console.log("tree", tree.values)
 
       }
     }
@@ -146,7 +145,6 @@ export async function saveProfile(
         profileChain.identity.__kind === "Value"
           ? profileChain.identity.value
           : undefined;
-      console.log("wallet", steamId, profileChain.identity.__kind, profileChain.identity)
       if (!steamId) {
 
         return;
@@ -162,7 +160,6 @@ export async function saveProfile(
     }
 
     const steamId = profileChain.data.get("steamId");
-    console.log("steamId", steamId)
     if (steamId && steamId.__kind == "SingleValue") {
       profile.steamId = steamId.value;
     }
@@ -280,7 +277,6 @@ export async function fetchFriendList(
         "friend_since": number
       }[]
     })
-    console.log(friendList)
     for (let friend of friendList) {
       let dataInDb = await orm.em.findOne(SteamFriend, {
         profile,
@@ -353,7 +349,6 @@ export async function fetchCollectible(
 
     if (!steamId) return;
 
-    console.log("launching puppeteer")
 
     const options = {
       product: "chrome",
@@ -372,11 +367,9 @@ export async function fetchCollectible(
     await page.content();
 
     let innerText = await page.evaluate(() => {
-      console.log("iner", document.querySelector("body"))
       return JSON.parse(document.querySelector("body")!.innerText);
     });
 
-    console.log(innerText, url);
     if (!innerText?.assets) return;
 
     await browser.close();
@@ -663,7 +656,6 @@ export async function fetchOwnedGamesDetails(
     );
 
     const steamId = profileObj.get("steamId");
-    console.log("steamID", steamId)
     if (!steamId) return;
     const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${config.steam_api_key}&steamid=${testingUser || profile.steamId || profile.identity}&format=json&include_appinfo=1&include_played_free_games=1`
     const ownedGameList = await axios.get(url).then(res => (res.data.response?.games || []) as ISteamOwnedGamesApi[])
@@ -695,7 +687,6 @@ export async function fetchOwnedGamesDetails(
     //   "img_icon_url": "69c2750e5d9d28db8a1e7d8fdcbfbe4ebe9c6ed3",
     //   "rtime_last_played": 0
     // }] as ISteamOwnedGamesApi[]
-    console.log("ownedGameList")
     for (let ownGame of ownedGameList) {
       await orm.em.upsert(SteamGame, {
         app_id:
@@ -707,7 +698,6 @@ export async function fetchOwnedGamesDetails(
         profile,
         app_id: ownGame.appid,
       });
-      console.log("dataInDb", dataInDb, ownGame.appid)
       const leave = tree.values.find((t) => t.app_id == ownGame.appid);
       let index = tree.values.length;
       let add;

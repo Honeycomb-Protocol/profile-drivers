@@ -39,7 +39,6 @@ const getFriends: Handler = (req: Request, res) => {
 };
 const getGames: Handler = (req: Request, res) => {
   const response = new ResponseHelper(res);
-  console.log("req.user", req.user)
   return req.orm?.em
     .find(SteamOwnedGames, {
       profile: {
@@ -163,7 +162,6 @@ const getGamesAchievements: Handler = (req: Request, res) => {
       if (!games) return response.notFound();
       const percentage = (games.filter(obj => obj.achieved === 1).length / games.length) * 100;
 
-      console.log(percentage);
       return response.ok(undefined, { games, achievementProgress: `${(percentage).toFixed(2)}%` });
     })
     .catch((e) => response.error(e.message));

@@ -14,7 +14,6 @@ export interface IProvableEntity {
   createdAt: Date;
   updatedAt: Date;
 }
-console.log(Profile)
 export abstract class ProvableEntity<
   T extends IProvableEntity
 > extends MikroBaseEntity<T, "_id"> {

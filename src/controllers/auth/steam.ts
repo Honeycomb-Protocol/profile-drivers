@@ -12,7 +12,6 @@ const router = express.Router();
 
 router.get("/", authenticate, async (req: Request, res: Response) => {
     const response = new ResponseHelper(res);
-    console.log("req", req.user, req.steam)
     if (!req.user || !req.steam)
         return response.error("web3User not found in session.");
     try {
@@ -61,7 +60,6 @@ router.get("/callback", authenticate, async (req: Request, res: Response) => {
 
 router.get("/profile/:identity", authenticate, async (req: Request, res: Response) => {
     const response = new ResponseHelper(res);
-    console.log('req.params')
     if (!req.user || !req.orm || !req.honeycomb || !req.steam)
         return response.error("web3User not found in session.");
 
