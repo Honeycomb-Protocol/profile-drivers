@@ -73,7 +73,7 @@ app.use(
 
   app.use(bypass_authenticate);
   app.use(routes);
-  crons();
+  crons(honeycomb, orm);
 
   app.listen(port, () => {
     console.log(colors.green(`[server] Listening on port ${port}`));

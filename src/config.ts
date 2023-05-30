@@ -63,8 +63,8 @@ export async function getHoneycomb(
 
 export function steamClient() {
   return new SteamAuth({
-    realm: "https://profiles.honeycombprotocol.com", // Site name displayed to users on logon
-    returnUrl: "https://profiles.honeycombprotocol.com/edit/profiles/steam/callback", // Your return route
+    realm: "http://localhost:3000", // Site name displayed to users on logon
+    returnUrl: "http://localhost:3000/edit/profiles/steam/callback", // Your return route
     apiKey: config.steam_api_key, // Steam API key
   });
 }

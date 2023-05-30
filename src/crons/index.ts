@@ -1,11 +1,12 @@
-// import cron from "node-cron";
-// import collectibles from "./collectibles";
+import cron from "node-cron";
 
-export default function () {
+import { Honeycomb } from "@honeycomb-protocol/hive-control";
+import { MikroORM } from "@mikro-orm/sqlite";
+import { refreshData, startSocket } from "../sockets";
 
-    // collectibles().catch((e: any) => console.error("[CRON] collectibles", e));
-    // // Run Every Day at 12:00 AM
-    // cron.schedule("0 0 * * *", () => {
-    //     collectibles().catch((e) => console.error("[CRON] collectibles", e));
-    // });
+export default function (honeycomb: Honeycomb, orm: MikroORM) {
+  cron.schedule("* * 3 * * *", () => {
+    console.log("cron job working")
+    refreshData(honeycomb, orm).then(() => startSocket(honeycomb, orm));
+  });
 }

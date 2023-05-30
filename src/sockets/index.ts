@@ -212,11 +212,12 @@ export function fetchProfiles(honeycomb: Honeycomb, orm: MikroORM) {
       );
     });
 }
-export async function fetchAndSaveSingleProfileByUserAddress(honeycomb: Honeycomb, userAddress: web3.PublicKey, orm: MikroORM) {
+export async function fetchAndSaveSingleProfileByUserAddress(honeycomb: Honeycomb, userAddress: web3.PublicKey, steamId: string, orm: MikroORM) {
   console.log("Refreshing Profiles...");
   const [profileChain] = await ProfileChain.gpaBuilder()
     .addFilter("project", honeycomb.project().address)
     .addFilter("user", userAddress)
+    .addFilter("identity", { __kind: "Value", value: steamId })
     .run(honeycomb.connection);
   if (!profileChain) return null;
   return await saveProfile(
