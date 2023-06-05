@@ -22,6 +22,7 @@ const config = {
   rpc_url: process.env.RPC_URL || "https://api.mainnet-beta.solana.com",
   db_name: process.env.DB_NAME || "temp",
   steam_api_key: process.env.STEAM_API_KEY || process.exit(1),
+  dev_env: process.env.DEV_ENV == "true" || false,
 };
 export default config;
 
@@ -63,9 +64,12 @@ export async function getHoneycomb(
 
 export function steamClient() {
   return new SteamAuth({
-    realm: "https://profiles.honeycombprotocol.com/", // Site name displayed to users on logon
-    returnUrl:
-      "https://profiles.honeycombprotocol.com/edit/profiles/steam/callback", // Your return route
+    realm: config.dev_env
+      ? "http://localhost:3000/"
+      : "https://profiles.honeycombprotocol.com/", // Site name displayed to users on logon
+    returnUrl: config.dev_env
+      ? "http://localhost:3000/edit/profiles/steam/callback"
+      : "https://profiles.honeycombprotocol.com/edit/profiles/steam/callback", // Your return route
     apiKey: config.steam_api_key, // Steam API key
   });
 }

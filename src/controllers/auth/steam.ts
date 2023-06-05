@@ -49,14 +49,14 @@ router.get("/callback", authenticate, async (req: Request, res: Response) => {
       });
     const urlForPlayerSummary = `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${config.steam_api_key}&steamids=${user.steamid}`;
     const {
-      players: [{ avatarfull }],
+      players: [{ avatarfull, loccountrycode }],
     } = await req.honeycomb
       .http()
       .get(urlForPlayerSummary)
       .then((res) => {
         console.log("response image", res.response.players);
         return (res.response || {}) as {
-          players: { avatarfull: string }[];
+          players: { avatarfull: string; loccountrycode: string }[];
         };
       });
 
@@ -67,6 +67,7 @@ router.get("/callback", authenticate, async (req: Request, res: Response) => {
       steamId: user.steamid,
       steamUsername: user.username || user.name,
       steamImage: avatarfull,
+      steamCountry: loccountrycode,
     });
   } catch (err: any) {
     console.error(err);
@@ -112,11 +113,13 @@ router.post(
       steamUsername,
       steamLevel,
       steamImage,
+      steamCountry,
     }: {
       steamId: string;
       steamUsername: string;
       steamLevel: string;
       steamImage: string;
+      steamCountry: string;
     } = req.body;
 
     if (!steamId || !steamUsername || !steamLevel)
@@ -196,6 +199,14 @@ router.post(
           .add("steamImage", steamImage)
           .then((_) => {
             profile.steamImage = steamImage;
+          })
+          .catch(console.error);
+      }
+      if (steamCountry) {
+        await profileChain
+          .add("steamCountry", steamCountry)
+          .then((_) => {
+            profile.steamCountry = steamCountry;
           })
           .catch(console.error);
       }

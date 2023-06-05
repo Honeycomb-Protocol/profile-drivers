@@ -1,4 +1,4 @@
-import { SteamFriend } from './SteamFriend';
+import { SteamFriend } from "./SteamFriend";
 import {
   Collection,
   Entity,
@@ -17,16 +17,16 @@ export interface IProfile {
   steamId?: string;
 }
 
-
 @Entity()
 export class Profile
   extends BaseEntity<Profile, "address">
-  implements IProfile {
+  implements IProfile
+{
   @PrimaryKey()
   address!: PublicKey;
 
   @Property()
-  userAddress!: PublicKey
+  userAddress!: PublicKey;
 
   @Property()
   identity!: string;
@@ -48,6 +48,10 @@ export class Profile
     nullable: true,
   })
   steamLevel!: number;
+  @Property({
+    nullable: true,
+  })
+  steamCountry!: string;
 
   @OneToMany(() => SteamFriend, (steamFriend) => steamFriend.profile)
   friends = new Collection<SteamFriend>(this);
