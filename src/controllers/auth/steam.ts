@@ -162,7 +162,8 @@ router.post(
             new web3.PublicKey(req.user.address),
             { __kind: "Value", value: steamId }
           )[0],
-          profileChain.profile()
+          //@ts-ignore
+          profileChain._profile
         );
         if (!profileOrUndefined) return response.error("Couldn't save profile");
         profile = profileOrUndefined;

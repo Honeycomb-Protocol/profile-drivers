@@ -16,7 +16,7 @@ export const authenticate: Handler = async (
       req.user = req.session.web3User;
     } else {
       if (!req.honeycomb) return response.error("Honeycomb not initialized!");
-      const publicInfo = await req.honeycomb.publicInfo();
+      const publicInfo = await req.honeycomb.publicInfo(undefined, true);
       let authDriver = publicInfo.get("auth_driver_offchain");
       if (!authDriver) return response.notFound("Auth driver not found!");
       if (authDriver.charAt(-1) === "/") authDriver = authDriver.slice(0, -1);
@@ -59,7 +59,7 @@ export const bypass_authenticate: Handler = async (
       req.user = req.session.web3User;
     } else {
       if (!req.honeycomb) return response.error("Honeycomb not initialized!");
-      const publicInfo = await req.honeycomb.publicInfo();
+      const publicInfo = await req.honeycomb.publicInfo(undefined, true);
       let authDriver = publicInfo.get("auth_driver_offchain");
       if (!authDriver) return response.notFound("Auth driver not found!");
       if (authDriver.charAt(-1) === "/") authDriver = authDriver.slice(0, -1);
