@@ -10,7 +10,6 @@ import {
 import Twitter from "twitter-lite";
 
 dotenv.config();
-
 const config = {
   node_env: process.env.NODE_ENV,
   port: process.env.PORT || 4000,

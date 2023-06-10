@@ -79,7 +79,6 @@ router.post("/callback", authenticate, async (req: Request, res: Response) => {
       consumer_secret: config.twitter_consumer_secret,
     });
     const user = await userClient.get("account/verify_credentials");
-
     profileChain = await req.honeycomb
       .identity()
       .fetch()
