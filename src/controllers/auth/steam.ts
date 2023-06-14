@@ -38,6 +38,7 @@ router.get("/callback", authenticate, async (req: Request, res: Response) => {
 
   try {
     const user = await req.steam.authenticate(req);
+    console.log("user");
     const url = `https://api.steampowered.com/IPlayerService/GetSteamLevel/v1/?key=${config.steam_api_key}&steamid=${user.steamid}`;
     const { player_level } = await req.honeycomb
       .http()
@@ -49,24 +50,22 @@ router.get("/callback", authenticate, async (req: Request, res: Response) => {
       });
     const urlForPlayerSummary = `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${config.steam_api_key}&steamids=${user.steamid}`;
     const {
-      players: [{ avatarfull, loccountrycode }],
+      players: [{ loccountrycode }],
     } = await req.honeycomb
       .http()
       .get(urlForPlayerSummary)
       .then((res) => {
         console.log("response image", res.response.players);
         return (res.response || {}) as {
-          players: { avatarfull: string; loccountrycode: string }[];
+          players: { loccountrycode: string }[];
         };
       });
-
-    console.log("userimage, ", avatarfull);
 
     response.ok("Steam Auth Success!", {
       steamLevel: player_level.toString(),
       steamId: user.steamid,
       steamUsername: user.username || user.name,
-      steamImage: avatarfull,
+      steamImage: user.avatar.large,
       steamCountry: loccountrycode,
     });
   } catch (err: any) {

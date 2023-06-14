@@ -747,10 +747,10 @@ export async function fetchOwnedGamesDetails(
           [profile.address, index],
           ownGame.appid,
           ownGame.playtime_forever,
-          ownGame.rtime_last_played,
-          ownGame.playtime_windows_forever,
-          ownGame.playtime_mac_forever,
-          ownGame.playtime_linux_forever
+          ownGame.rtime_last_played || 0,
+          ownGame.playtime_windows_forever || 0,
+          ownGame.playtime_mac_forever || 0,
+          ownGame.playtime_linux_forever || 0
         );
       }
       try {

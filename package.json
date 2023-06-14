@@ -9,7 +9,7 @@
     "dev": "nodemon ./src/index.ts"
   },
   "dependencies": {
-    "@honeycomb-protocol/hive-control": "^0.1.5",
+    "@honeycomb-protocol/hive-control": "^0.1.6",
     "@metaplex-foundation/beet-solana": "^0.4.0",
     "@mikro-orm/core": "^5.6.15",
     "@mikro-orm/migrations": "^5.6.15",
