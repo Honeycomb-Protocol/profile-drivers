@@ -22,6 +22,7 @@ const getFriends: Handler = (req: Request, res) => {
         $or: [
           {
             steamId: req.params.steamId,
+            userAddress: req.user?.address,
           },
         ],
       },
@@ -46,6 +47,7 @@ const getFriends: Handler = (req: Request, res) => {
 };
 const getGames: Handler = (req: Request, res) => {
   const response = new ResponseHelper(res);
+  console.log("done", req.user);
   return req.orm?.em
     .find(
       SteamOwnedGames,
@@ -54,6 +56,7 @@ const getGames: Handler = (req: Request, res) => {
           $or: [
             {
               steamId: req.params.steamId,
+              userAddress: req.user?.address,
             },
           ],
         },
@@ -73,6 +76,7 @@ const getGames: Handler = (req: Request, res) => {
                 $or: [
                   {
                     steamId: req.params.steamId,
+                    userAddress: req.user?.address,
                   },
                 ],
               },
@@ -85,6 +89,7 @@ const getGames: Handler = (req: Request, res) => {
                     $or: [
                       {
                         steamId: req.params.steamId,
+                        userAddress: req.user?.address,
                       },
                     ],
                   },
@@ -143,6 +148,7 @@ const getCollectibles: Handler = (req: Request, res) => {
           $or: [
             {
               steamId: req.params.steamId,
+              userAddress: req.user?.address,
             },
           ],
         },
@@ -205,6 +211,7 @@ const getGamesAchievements: Handler = (req: Request, res) => {
           $or: [
             {
               steamId: req.params.steamId,
+              userAddress: req.user?.address,
             },
           ],
         },
