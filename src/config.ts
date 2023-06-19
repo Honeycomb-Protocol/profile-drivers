@@ -8,8 +8,7 @@ import {
   httpModule,
   identityModule,
 } from "@honeycomb-protocol/hive-control";
-// import SteamAuth from "node-steam-openid";
-import SteamAuth = require("./lib/steamAuth");
+import SteamAuth from "node-steam-openid";
 
 dotenv.config();
 
