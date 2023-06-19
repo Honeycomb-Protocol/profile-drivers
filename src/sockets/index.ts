@@ -362,9 +362,7 @@ export async function fetchCollectible(
         new web3.PublicKey(profile.userAddress),
         profile.identity
       );
-    const tree = profileObj.entity<ISteamGameCollectible>(
-      "SteamOwnedCollectible"
-    );
+    const tree = profileObj.entity<ISteamGameCollectible>(" ");
     tree.setLeaves(
       await orm.em
         .find(
@@ -957,6 +955,7 @@ export async function fetchAllEntitiesForAllGame(
       $in: fetchCollectiblesForOnly,
     },
   });
+  console.log(profile.steamId, games.length);
   for (let game of games) {
     await fetchAllEntitiesForGame(honeycomb, orm, profile, game);
   }

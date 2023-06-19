@@ -33,6 +33,7 @@ router.get("/", authenticate, async (req: Request, res: Response) => {
 });
 router.get("/callback", authenticate, async (req: Request, res: Response) => {
   const response = new ResponseHelper(res);
+  console.log("query", req.headers, req.query);
   if (!req.user || !req.orm || !req.honeycomb || !req.steam)
     return response.error("web3User not found in session.");
 
