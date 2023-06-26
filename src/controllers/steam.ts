@@ -22,7 +22,7 @@ const getFriends: Handler = (req: Request, res) => {
         $or: [
           {
             steamId: req.params.steamId,
-            userAddress: req.user?.address,
+            userAddress: req.params.address,
           },
         ],
       },
@@ -56,7 +56,7 @@ const getGames: Handler = (req: Request, res) => {
           $or: [
             {
               steamId: req.params.steamId,
-              userAddress: req.user?.address,
+              userAddress: req.params.address,
             },
           ],
         },
@@ -76,7 +76,7 @@ const getGames: Handler = (req: Request, res) => {
                 $or: [
                   {
                     steamId: req.params.steamId,
-                    userAddress: req.user?.address,
+                    userAddress: req.params.address,
                   },
                 ],
               },
@@ -89,7 +89,7 @@ const getGames: Handler = (req: Request, res) => {
                     $or: [
                       {
                         steamId: req.params.steamId,
-                        userAddress: req.user?.address,
+                        userAddress: req.params.address,
                       },
                     ],
                   },
@@ -148,7 +148,7 @@ const getCollectibles: Handler = (req: Request, res) => {
           $or: [
             {
               steamId: req.params.steamId,
-              userAddress: req.user?.address,
+              userAddress: req.params.address,
             },
           ],
         },
@@ -211,7 +211,7 @@ const getGamesAchievements: Handler = (req: Request, res) => {
           $or: [
             {
               steamId: req.params.steamId,
-              userAddress: req.user?.address,
+              userAddress: req.params.address,
             },
           ],
         },
@@ -236,12 +236,16 @@ const getGamesAchievements: Handler = (req: Request, res) => {
 
 const router = express.Router();
 
-router.get("/friends/:steamId", authenticate, getFriends);
-router.get("/games/:steamId", authenticate, getGames);
-router.get("/games/collectibles/:steamId", authenticate, getCollectibles);
+router.get("/friends/:address/:steamId", getFriends);
 router.get(
-  "/games/achievements/:steamId/:gameId",
-  authenticate,
+  "/games/collectibles/:address/:steamId",
+
+  getCollectibles
+);
+router.get("/games/:address/:steamId", getGames);
+router.get(
+  "/games/achievements/:address/:steamId/:gameId",
+
   getGamesAchievements
 );
 

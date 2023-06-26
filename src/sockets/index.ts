@@ -812,7 +812,6 @@ export async function ensureSteamUsersInDb(orm: MikroORM) {
     idsSet.delete(v.steamId);
   });
   let ids = Array.from(idsSet);
-  console.log("ids", ids);
   if (!ids.length) return;
   for (let index = 0; index < ids.length / 100; index++) {
     const url = `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${

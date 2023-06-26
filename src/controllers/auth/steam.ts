@@ -75,33 +75,29 @@ router.get("/callback", authenticate, async (req: Request, res: Response) => {
   }
 });
 
-router.get(
-  "/profile/:identity",
-  authenticate,
-  async (req: Request, res: Response) => {
-    const response = new ResponseHelper(res);
-    if (!req.user || !req.orm || !req.honeycomb || !req.steam)
-      return response.error("web3User not found in session.");
+router.get("/profile/:identity", async (req: Request, res: Response) => {
+  const response = new ResponseHelper(res);
+  if (!req.orm || !req.honeycomb || !req.steam)
+    return response.error("web3User not found in session.");
 
-    req.orm?.em
-      .find(Profile, {
-        $or: [
-          {
-            userAddress: req.params.identity,
-          },
-        ],
-      })
-      .then(async (profiles) => {
-        response.ok("Profile found!", {
-          profiles,
-        });
-      })
-      .catch((e) => {
-        console.error("verifying identity", e);
-        response.error("Verifying not found!");
+  req.orm?.em
+    .find(Profile, {
+      $or: [
+        {
+          userAddress: req.params.identity,
+        },
+      ],
+    })
+    .then(async (profiles) => {
+      response.ok("Profile found!", {
+        profiles,
       });
-  }
-);
+    })
+    .catch((e) => {
+      console.error("verifying identity", e);
+      response.error("Verifying not found!");
+    });
+});
 
 router.post(
   "/createProfile",
